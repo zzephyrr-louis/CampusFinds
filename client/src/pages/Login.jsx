@@ -43,7 +43,7 @@ function Login() {
       setIsSubmitting(true)
       const response = await api.post('/auth/login', formData)
       login(response.data)
-      navigate('/account')
+      navigate('/dashboard')
     } catch (error) {
       setServerMessage(error.response?.data?.message || 'Unable to log in. Please try again.')
       setErrors(error.response?.data?.errors || {})

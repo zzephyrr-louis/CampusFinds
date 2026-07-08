@@ -1,20 +1,38 @@
-import axios from 'axios'
+const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
-const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || 'http://localhost:5000/api',
-  headers: {
-    'Content-Type': 'application/json',
-  },
-})
-
-api.interceptors.request.use((config) => {
+async function request(path, options = {}) {
   const token = localStorage.getItem('campusfind_token')
-
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`
+  const headers = {
+    'Content-Type': 'application/json',
+    ...options.headers,
   }
 
-  return config
-})
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+
+  const response = await fetch(`${baseURL}${path}`, {
+    ...options,
+    headers,
+  })
+  const data = await response.json().catch(() => ({}))
+
+  if (!response.ok) {
+    const error = new Error(data.message || 'Request failed.')
+    error.response = { data, status: response.status }
+    throw error
+  }
+
+  return { data }
+}
+
+const api = {
+  post(path, body) {
+    return request(path, {
+      method: 'POST',
+      body: JSON.stringify(body),
+    })
+  },
+}
 
 export default api

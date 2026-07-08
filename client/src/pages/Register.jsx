@@ -50,7 +50,7 @@ function Register() {
       setIsSubmitting(true)
       const response = await api.post('/auth/register', formData)
       login(response.data)
-      navigate('/account')
+      navigate('/dashboard')
     } catch (error) {
       setServerMessage(error.response?.data?.message || 'Unable to register. Please try again.')
       setErrors(error.response?.data?.errors || {})
