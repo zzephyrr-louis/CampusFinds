@@ -1,15 +1,21 @@
 import { useReducer } from 'react'
 import AuthContext from './authContext'
+import { readStoredJson, writeStoredJson } from '../utils/storage'
 
-const initialState = {
-  user: JSON.parse(localStorage.getItem('campusfind_user') || 'null'),
-  token: localStorage.getItem('campusfind_token'),
+function createInitialState() {
+  const user = readStoredJson('campusfind_user')
+  const token = localStorage.getItem('campusfind_token')
+
+  return {
+    user: user && token ? user : null,
+    token: user && token ? token : null,
+  }
 }
 
 function authReducer(state, action) {
   switch (action.type) {
     case 'LOGIN': {
-      localStorage.setItem('campusfind_user', JSON.stringify(action.payload.user))
+      writeStoredJson('campusfind_user', action.payload.user)
       localStorage.setItem('campusfind_token', action.payload.token)
 
       return {
@@ -32,7 +38,7 @@ function authReducer(state, action) {
 }
 
 export function AuthProvider({ children }) {
-  const [state, dispatch] = useReducer(authReducer, initialState)
+  const [state, dispatch] = useReducer(authReducer, undefined, createInitialState)
 
   function login(payload) {
     dispatch({ type: 'LOGIN', payload })

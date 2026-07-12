@@ -1,8 +1,13 @@
-import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { FaArrowRight, FaLock, FaUniversity } from 'react-icons/fa'
-import api from '../services/api'
+import { useEffect, useState } from 'react'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
+import { FaArrowRight, FaLock } from 'react-icons/fa6'
+import AuthLayout from '../components/auth/AuthLayout'
+import FormField from '../components/auth/FormField'
+import MockModeNotice from '../components/auth/MockModeNotice'
+import PasswordField from '../components/auth/PasswordField'
 import { useAuth } from '../context/useAuth'
+import api from '../services/api'
+import { validateLogin } from '../utils/validation'
 
 const initialForm = {
   email: '',
@@ -15,35 +20,37 @@ function Login() {
   const [serverMessage, setServerMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const { login } = useAuth()
+  const location = useLocation()
   const navigate = useNavigate()
+
+  useEffect(() => {
+    document.title = 'Log in | CampusFind'
+  }, [])
 
   function handleChange(event) {
     const { name, value } = event.target
     setFormData((current) => ({ ...current, [name]: value }))
     setErrors((current) => ({ ...current, [name]: '' }))
-  }
-
-  function validateForm() {
-    const nextErrors = {}
-
-    if (!formData.email.trim()) nextErrors.email = 'Email is required.'
-    if (!formData.password) nextErrors.password = 'Password is required.'
-
-    setErrors(nextErrors)
-    return Object.keys(nextErrors).length === 0
+    setServerMessage('')
   }
 
   async function handleSubmit(event) {
     event.preventDefault()
+    const nextErrors = validateLogin(formData)
+    setErrors(nextErrors)
     setServerMessage('')
 
-    if (!validateForm()) return
+    if (Object.keys(nextErrors).length > 0) return
 
     try {
       setIsSubmitting(true)
-      const response = await api.post('/auth/login', formData)
+      const response = await api.post('/auth/login', {
+        email: formData.email.trim().toLowerCase(),
+        password: formData.password,
+      })
       login(response.data)
-      navigate('/dashboard')
+      const destination = location.state?.from?.startsWith('/') ? location.state.from : '/dashboard'
+      navigate(destination, { replace: true })
     } catch (error) {
       setServerMessage(error.response?.data?.message || 'Unable to log in. Please try again.')
       setErrors(error.response?.data?.errors || {})
@@ -53,62 +60,65 @@ function Login() {
   }
 
   return (
-    <main className="auth-page">
-      <section className="auth-panel brand-panel">
-        <div className="brand-mark">
-          <FaUniversity aria-hidden="true" />
-        </div>
-        <p className="eyebrow">CampusFind</p>
-        <h1>Lost and found reports for campus life.</h1>
-        <p className="auth-copy">
-          Sign in to report items, track claims, and stay updated when the admin reviews your requests.
+    <AuthLayout
+      eyebrow="Welcome back"
+      title="Log in to your account"
+      description="Enter your CampusFind account details to continue."
+    >
+      <MockModeNotice />
+
+      {import.meta.env.VITE_API_MODE === 'mock' && (
+        <p className="demo-credentials">
+          Demo account: <strong>student@campusfind.local</strong> with any test password.
         </p>
-      </section>
+      )}
 
-      <section className="auth-panel form-panel" aria-labelledby="login-title">
-        <div>
-          <p className="eyebrow">Welcome back</p>
-          <h2 id="login-title">Log in</h2>
-        </div>
-
-        {serverMessage && <p className="form-alert">{serverMessage}</p>}
-
-        <form className="auth-form" onSubmit={handleSubmit}>
-          <label>
-            Email
-            <input
-              type="email"
-              name="email"
-              value={formData.email}
-              onChange={handleChange}
-              autoComplete="email"
-            />
-            {errors.email && <span>{errors.email}</span>}
-          </label>
-
-          <label>
-            Password
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleChange}
-              autoComplete="current-password"
-            />
-            {errors.password && <span>{errors.password}</span>}
-          </label>
-
-          <button className="primary-button" type="submit" disabled={isSubmitting}>
-            <FaLock aria-hidden="true" />
-            {isSubmitting ? 'Logging in...' : 'Log in'}
-          </button>
-        </form>
-
-        <p className="auth-switch">
-          New student? <Link to="/register">Create an account <FaArrowRight aria-hidden="true" /></Link>
+      {serverMessage && (
+        <p className="form-alert" role="alert">
+          {serverMessage}
         </p>
-      </section>
-    </main>
+      )}
+
+      <form className="auth-form" onSubmit={handleSubmit} noValidate>
+        <FormField
+          id="login-email"
+          label="Email address"
+          type="email"
+          name="email"
+          value={formData.email}
+          onChange={handleChange}
+          autoComplete="email"
+          placeholder="student@campusfind.local"
+          required
+          error={errors.email}
+          disabled={isSubmitting}
+        />
+
+        <PasswordField
+          id="login-password"
+          label="Password"
+          name="password"
+          value={formData.password}
+          onChange={handleChange}
+          autoComplete="current-password"
+          required
+          error={errors.password}
+          disabled={isSubmitting}
+        />
+
+        <button className="primary-button" type="submit" disabled={isSubmitting}>
+          <FaLock aria-hidden="true" />
+          {isSubmitting ? 'Logging in…' : 'Log in'}
+        </button>
+      </form>
+
+      <p className="auth-switch">
+        New to CampusFind?
+        <Link to="/register">
+          Create an account <FaArrowRight aria-hidden="true" />
+        </Link>
+      </p>
+    </AuthLayout>
   )
 }
 
