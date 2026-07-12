@@ -6,7 +6,7 @@ pushd "%~dp0"
 curl.exe --silent --fail --max-time 2 http://127.0.0.1:5173/ >nul 2>&1
 if not errorlevel 1 (
   echo CampusFind is already running. Opening it now...
-  start "" "http://127.0.0.1:5173/"
+  rundll32.exe url.dll,FileProtocolHandler "http://127.0.0.1:5173/"
   popd
   exit /b 0
 )
