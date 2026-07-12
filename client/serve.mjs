@@ -34,7 +34,7 @@ if (!existsSync(indexFile)) {
 
 function openBrowser(url) {
   const command = process.platform === 'win32'
-    ? ['cmd.exe', ['/d', '/s', '/c', `start "" "${url}"`]]
+    ? ['rundll32.exe', ['url.dll,FileProtocolHandler', url]]
     : process.platform === 'darwin'
       ? ['open', [url]]
       : ['xdg-open', [url]]
