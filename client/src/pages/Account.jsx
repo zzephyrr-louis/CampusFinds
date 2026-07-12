@@ -1,87 +1,32 @@
-import { Navigate } from 'react-router-dom'
-import { FaRightFromBracket, FaShieldHalved, FaUserGraduate } from 'react-icons/fa6'
-import { useEffect, useMemo, useState } from 'react'
-import { useAuth } from '../context/useAuth'
+import { useEffect } from 'react'
+import { Link } from 'react-router-dom'
+import { FaArrowLeft, FaShieldHalved, FaUserGraduate } from 'react-icons/fa6'
 import StudentID from '../components/StudentID'
+import { useAuth } from '../context/useAuth'
 
 function Account() {
-  const { user, isAuthenticated, logout } = useAuth()
-  const [displayIndex, setDisplayIndex] = useState(0)
-
-  const studentList = useMemo(() => {
-    if (!user) return []
-
-    return [
-      user,
-      {
-        student_id: '2009-00732',
-        fullname: 'Von',
-        email: 'von@campusfind.edu',
-        role: 'student',
-      },
-      {
-        student_id: '2009-00327',
-        fullname: 'Alphonse',
-        email: 'alphonse@campusfind.edu',
-        role: 'student',
-      },
-      {
-        student_id: '2009-00273',
-        fullname: 'Godinez',
-        email: 'godinez@campusfind.edu',
-        role: 'student',
-      },
-    ]
-  }, [user])
-
-  const selectedStudent = studentList[displayIndex]
-  const isFirstStudent = displayIndex === 0
-  const isLastStudent = displayIndex === studentList.length - 1
+  const { user } = useAuth()
 
   useEffect(() => {
-    if (user) {
-      document.title = `${user.fullname} | CampusFind`
-    }
-  }, [user])
-
-  function showPreviousStudent() {
-    setDisplayIndex((current) => Math.max(current - 1, 0))
-  }
-
-  function showNextStudent() {
-    setDisplayIndex((current) => Math.min(current + 1, studentList.length - 1))
-  }
-
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />
-  }
+    document.title = 'My account | CampusFind'
+  }, [])
 
   return (
-    <main className="account-page">
-      <section className="account-card">
-        <div className="account-icon">
-          {user.role === 'admin' ? <FaShieldHalved aria-hidden="true" /> : <FaUserGraduate aria-hidden="true" />}
+    <section className="account-page" aria-labelledby="account-title">
+      <div className="account-card">
+        <div className="account-icon" aria-hidden="true">
+          {user?.role === 'admin' ? <FaShieldHalved /> : <FaUserGraduate />}
         </div>
-        <p className="eyebrow">Signed in</p>
-        <h1>{user.fullname}</h1>
-        <StudentID student={selectedStudent} />
-        <div className="student-controls" aria-label="Student preview controls">
-          <button className="secondary-button" type="button" onClick={showPreviousStudent} disabled={isFirstStudent}>
-            Prev
-          </button>
-          <span>
-            {displayIndex + 1} / {studentList.length}
-          </span>
-          <button className="secondary-button" type="button" onClick={showNextStudent} disabled={isLastStudent}>
-            Next
-          </button>
-        </div>
-        <button className="secondary-button" type="button" onClick={logout}>
-          <FaRightFromBracket aria-hidden="true" />
-          Log out
-        </button>
-      </section>
-    </main>
+        <p className="eyebrow">Account profile</p>
+        <h1 id="account-title">{user?.fullname}</h1>
+        <p className="account-intro">These details are used to identify your reports and claims.</p>
+        <StudentID student={user} />
+        <Link className="secondary-button account-back" to="/dashboard">
+          <FaArrowLeft aria-hidden="true" />
+          Back to dashboard
+        </Link>
+      </div>
+    </section>
   )
 }
 
