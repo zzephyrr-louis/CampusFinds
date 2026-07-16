@@ -1,0 +1,14 @@
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/**
+!**/src/test/**
+
+### IDE ###
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+
+### Uploaded files (don't commit user uploads) ###
+uploads/
