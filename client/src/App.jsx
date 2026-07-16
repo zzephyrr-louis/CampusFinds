@@ -4,6 +4,7 @@ import ProtectedRoute from './components/routing/ProtectedRoute'
 import PublicOnlyRoute from './components/routing/PublicOnlyRoute'
 import RoleRoute from './components/routing/RoleRoute'
 import Account from './pages/Account'
+import AdminPanel from './pages/AdminPanel'
 import Dashboard from './pages/Dashboard'
 import FeaturePlaceholder from './pages/FeaturePlaceholder'
 import Login from './pages/Login'
@@ -85,16 +86,7 @@ function App() {
             }
           />
           <Route element={<RoleRoute allowedRoles={['admin']} />}>
-            <Route
-              path="/admin"
-              element={
-                <FeaturePlaceholder
-                  title="Admin Panel"
-                  description="Authorized administrators will verify reports, review claims, manage statuses, and monitor activity here."
-                  owner="Member 3"
-                />
-              }
-            />
+            <Route path="/admin" element={<AdminPanel />} />
           </Route>
         </Route>
       </Route>
