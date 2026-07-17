@@ -69,7 +69,8 @@ function Login() {
 
       {import.meta.env.VITE_API_MODE === 'mock' && (
         <p className="demo-credentials">
-          Demo account: <strong>student@campusfind.local</strong> with any test password.
+          Student: <strong>student@campusfind.local</strong> or admin:{' '}
+          <strong>admin@campusfind.local</strong>. Use any test password.
         </p>
       )}
 

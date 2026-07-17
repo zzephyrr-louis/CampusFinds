@@ -7,9 +7,11 @@ import Account from './pages/Account'
 import AdminPanel from './pages/AdminPanel'
 import Dashboard from './pages/Dashboard'
 import FeaturePlaceholder from './pages/FeaturePlaceholder'
+import ItemDetails from './pages/ItemDetails'
 import Login from './pages/Login'
 import Notifications from './pages/Notifications'
 import Register from './pages/Register'
+import SearchItems from './pages/SearchItems'
 import './App.css'
 
 function App() {
@@ -46,26 +48,8 @@ function App() {
               />
             }
           />
-          <Route
-            path="/search-items"
-            element={
-              <FeaturePlaceholder
-                title="Search Items"
-                description="Students will search and filter lost and found reports by keyword, category, location, date, and status here."
-                owner="Member 2"
-              />
-            }
-          />
-          <Route
-            path="/items/:itemId"
-            element={
-              <FeaturePlaceholder
-                title="Item Details"
-                description="This page will show one complete item report, its status history, and available claim actions."
-                owner="Member 2"
-              />
-            }
-          />
+          <Route path="/search-items" element={<SearchItems />} />
+          <Route path="/items/:itemId" element={<ItemDetails />} />
           <Route
             path="/claims"
             element={
