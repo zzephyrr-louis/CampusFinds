@@ -8,10 +8,12 @@ import {
   FaUser,
 } from 'react-icons/fa6'
 import { useAuth } from '../../context/useAuth'
+import { useNotifications } from '../../context/useNotifications'
 
 function Navbar({ isMenuOpen, menuButtonRef, onMenuToggle }) {
   const [query, setQuery] = useState('')
   const { user, logout } = useAuth()
+  const { unreadCount } = useNotifications()
   const navigate = useNavigate()
 
   function handleSearch(event) {
@@ -63,9 +65,13 @@ function Navbar({ isMenuOpen, menuButtonRef, onMenuToggle }) {
       </form>
 
       <div className="navbar-actions">
-        <Link className="icon-button notification-link" to="/notifications" aria-label="Notifications">
+        <Link
+          className="icon-button notification-link"
+          to="/notifications"
+          aria-label={unreadCount > 0 ? `Notifications, ${unreadCount} unread` : 'Notifications'}
+        >
           <FaBell aria-hidden="true" />
-          <span className="notification-dot" aria-hidden="true" />
+          {unreadCount > 0 && <span className="notification-dot" aria-hidden="true" />}
         </Link>
         <Link className="profile-link" to="/account" aria-label={`Open ${displayName}'s account`}>
           <span className="profile-avatar" aria-hidden="true">

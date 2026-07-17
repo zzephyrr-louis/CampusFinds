@@ -8,6 +8,7 @@ import AdminPanel from './pages/AdminPanel'
 import Dashboard from './pages/Dashboard'
 import FeaturePlaceholder from './pages/FeaturePlaceholder'
 import Login from './pages/Login'
+import Notifications from './pages/Notifications'
 import Register from './pages/Register'
 import './App.css'
 
@@ -75,16 +76,7 @@ function App() {
               />
             }
           />
-          <Route
-            path="/notifications"
-            element={
-              <FeaturePlaceholder
-                title="Notifications"
-                description="Possible matches, claim decisions, and important CampusFind updates will appear here."
-                owner="Member 3"
-              />
-            }
-          />
+          <Route path="/notifications" element={<Notifications />} />
           <Route element={<RoleRoute allowedRoles={['admin']} />}>
             <Route path="/admin" element={<AdminPanel />} />
           </Route>
