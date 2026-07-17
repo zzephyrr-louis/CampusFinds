@@ -18,6 +18,13 @@ const typeConfig = {
   system: { icon: FaCircleInfo, label: 'CampusFind update', tone: 'blue' },
 }
 
+function formatNotificationDate(value) {
+  return new Intl.DateTimeFormat('en-PH', {
+    dateStyle: 'medium',
+    timeStyle: 'short',
+  }).format(new Date(value))
+}
+
 function Notifications() {
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
   const [filter, setFilter] = useState('all')
@@ -58,11 +65,10 @@ function Notifications() {
       </div>
 
       <div className="dashboard-card notifications-card">
-        <div className="notification-filters" role="tablist" aria-label="Filter notifications">
+        <div className="notification-filters" aria-label="Filter notifications">
           <button
             type="button"
-            role="tab"
-            aria-selected={filter === 'all'}
+            aria-pressed={filter === 'all'}
             className={filter === 'all' ? 'active' : ''}
             onClick={() => setFilter('all')}
           >
@@ -71,8 +77,7 @@ function Notifications() {
           </button>
           <button
             type="button"
-            role="tab"
-            aria-selected={filter === 'unread'}
+            aria-pressed={filter === 'unread'}
             className={filter === 'unread' ? 'active' : ''}
             onClick={() => setFilter('unread')}
           >
@@ -81,61 +86,67 @@ function Notifications() {
           </button>
         </div>
 
-        {visibleNotifications.length === 0 ? (
-          <p className="empty-state">
-            {filter === 'unread' ? "You're all caught up. No unread notifications." : 'No notifications yet.'}
-          </p>
-        ) : (
-          <ul className="notification-list">
-            {visibleNotifications.map((notification) => {
-              const config = typeConfig[notification.type] || typeConfig.system
-              const Icon = config.icon
+        <div className="notification-results" aria-live="polite">
+          {visibleNotifications.length === 0 ? (
+            <p className="empty-state">
+              {filter === 'unread' ? "You're all caught up. No unread notifications." : 'No notifications yet.'}
+            </p>
+          ) : (
+            <ul className="notification-list">
+              {visibleNotifications.map((notification) => {
+                const config = typeConfig[notification.type] || typeConfig.system
+                const Icon = config.icon
 
-              return (
-                <li
-                  key={notification.id}
-                  className={`notification-item notification-${config.tone} ${
-                    notification.read ? '' : 'is-unread'
-                  }`}
-                >
-                  <span className="notification-icon" aria-hidden="true">
-                    <Icon />
-                  </span>
-                  <div className="notification-body">
-                    <div className="notification-top">
-                      <p className="notification-type">{config.label}</p>
-                      <strong>{notification.title}</strong>
+                return (
+                  <li
+                    key={notification.id}
+                    className={`notification-item notification-${config.tone} ${
+                      notification.read ? '' : 'is-unread'
+                    }`}
+                  >
+                    <span className="notification-icon" aria-hidden="true">
+                      <Icon />
+                    </span>
+                    <div className="notification-body">
+                      <div className="notification-top">
+                        <p className="notification-type">{config.label}</p>
+                        <strong>{notification.title}</strong>
+                      </div>
+                      <p className="notification-message">{notification.message}</p>
+                      <div className="notification-meta">
+                        <time dateTime={notification.createdAt}>{formatNotificationDate(notification.createdAt)}</time>
+                        {notification.itemId && (
+                          <Link
+                            className="text-link"
+                            to={`/items/${notification.itemId}`}
+                            onClick={() => markAsRead(notification.id)}
+                          >
+                            View item
+                          </Link>
+                        )}
+                        {notification.claimId && (
+                          <Link className="text-link" to="/claims" onClick={() => markAsRead(notification.id)}>
+                            View claim
+                          </Link>
+                        )}
+                      </div>
                     </div>
-                    <p className="notification-message">{notification.message}</p>
-                    <div className="notification-meta">
-                      <time dateTime={notification.createdAt}>{notification.displayDate}</time>
-                      {notification.itemId && (
-                        <Link className="text-link" to={`/items/${notification.itemId}`}>
-                          View item
-                        </Link>
-                      )}
-                      {notification.claimId && (
-                        <Link className="text-link" to="/claims">
-                          View claim
-                        </Link>
-                      )}
-                    </div>
-                  </div>
-                  {!notification.read && (
-                    <button
-                      className="mark-read-button"
-                      type="button"
-                      onClick={() => markAsRead(notification.id)}
-                      aria-label={`Mark "${notification.title}" as read`}
-                    >
-                      <FaCheck aria-hidden="true" />
-                    </button>
-                  )}
-                </li>
-              )
-            })}
-          </ul>
-        )}
+                    {!notification.read && (
+                      <button
+                        className="mark-read-button"
+                        type="button"
+                        onClick={() => markAsRead(notification.id)}
+                        aria-label={`Mark "${notification.title}" as read`}
+                      >
+                        <FaCheck aria-hidden="true" />
+                      </button>
+                    )}
+                  </li>
+                )
+              })}
+            </ul>
+          )}
+        </div>
       </div>
     </section>
   )
