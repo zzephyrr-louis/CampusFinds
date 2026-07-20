@@ -5,6 +5,7 @@ import PublicOnlyRoute from './components/routing/PublicOnlyRoute'
 import RoleRoute from './components/routing/RoleRoute'
 import Account from './pages/Account'
 import AdminPanel from './pages/AdminPanel'
+import Claims from './pages/Claims'
 import Dashboard from './pages/Dashboard'
 import FeaturePlaceholder from './pages/FeaturePlaceholder'
 import ItemDetails from './pages/ItemDetails'
@@ -50,16 +51,7 @@ function App() {
           />
           <Route path="/search-items" element={<SearchItems />} />
           <Route path="/items/:itemId" element={<ItemDetails />} />
-          <Route
-            path="/claims"
-            element={
-              <FeaturePlaceholder
-                title="My Claims"
-                description="Students will submit proof of ownership and track pending, approved, rejected, and completed claims here."
-                owner="Member 3"
-              />
-            }
-          />
+          <Route path="/claims" element={<Claims />} />
           <Route path="/notifications" element={<Notifications />} />
           <Route element={<RoleRoute allowedRoles={['admin']} />}>
             <Route path="/admin" element={<AdminPanel />} />
