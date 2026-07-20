@@ -3,6 +3,7 @@ import { readStoredJson, writeStoredJson } from '../utils/storage'
 const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 const apiMode = import.meta.env.VITE_API_MODE || 'mock'
 const mockUsersKey = 'campusfind_mock_users'
+const mockReportsKey = 'campusfind_mock_reports'
  
 const demoUsers = [
   {
@@ -96,6 +97,32 @@ function mockSubmitClaim(body) {
     },
   }
 }
+
+function mockSubmitReport(body, type) {
+  if (!body.item_name?.trim() || !body.category || !body.event_date || !body.location?.trim()) {
+    throw createApiError('Complete the required item details before submitting.', 400)
+  }
+  if (!body.description?.trim() || body.description.trim().length < 15) {
+    throw createApiError('Please provide a more complete item description.', 400)
+  }
+  if (type === 'found' && (!body.condition || !body.storage_location?.trim())) {
+    throw createApiError('Include the item condition and storage location for a found report.', 400)
+  }
+
+  const item = {
+    item_id: `mock-${type}-${Date.now()}`,
+    ...body,
+    item_name: body.item_name.trim(),
+    location: body.location.trim(),
+    description: body.description.trim(),
+    report_type: type,
+    status: type === 'lost' ? 'Open' : 'Unclaimed',
+    created_at: new Date().toISOString(),
+  }
+  const reports = readStoredJson(mockReportsKey, [])
+  writeStoredJson(mockReportsKey, [item, ...(Array.isArray(reports) ? reports : [])])
+  return { data: { item } }
+}
  
 async function mockRequest(path, options = {}) {
   const method = options.method || 'GET'
@@ -115,6 +142,8 @@ async function mockRequest(path, options = {}) {
   if (method === 'POST' && path === '/auth/register') return mockRegister(body)
   if (method === 'GET' && path === '/items/claimable') return { data: [] }
   if (method === 'POST' && path === '/claims') return mockSubmitClaim(body)
+  if (method === 'POST' && path === '/items/lost') return mockSubmitReport(body, 'lost')
+  if (method === 'POST' && path === '/items/found') return mockSubmitReport(body, 'found')
   if (method === 'GET' && path === '/claims/mine') return { data: [] }
  
   throw createApiError(`No mock response is configured for ${path}.`, 404)
