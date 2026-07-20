@@ -1,0 +1,28 @@
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "Express and SQLite backend for CampusFind.",
+  "main": "server.js",
+  "scripts": {
+    "dev": "nodemon server.js",
+    "start": "node server.js",
+    "test:db": "node -e \"const { initializeDatabase } = require('./database/schema'); const { testConnection, closeDatabase } = require('./db'); (async () => { await initializeDatabase(); const ok = await testConnection(); console.log(ok ? 'Database connection test passed.' : 'Database connection test failed.'); await closeDatabase(); process.exit(ok ? 0 : 1); })().catch(async (error) => { console.error(error); try { await closeDatabase(); } catch (_) {} process.exit(1); });\""
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "dependencies": {
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^12.11.1",
+    "cors": "^2.8.6",
+    "dotenv": "^17.4.2",
+    "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
+    "multer": "^2.2.0",
+    "sqlite3": "^6.0.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
