@@ -1,5 +1,3 @@
-import React from 'react';
-
 function AdminTable({ users, onEdit, onDelete }) {
     return (
         <div className="admin-table-container">

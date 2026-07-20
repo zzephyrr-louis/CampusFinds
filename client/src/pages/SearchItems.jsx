@@ -1,14 +1,7 @@
 import { useEffect, useMemo } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
-import {
-  FaBoxOpen,
-  FaCalendar,
-  FaChevronRight,
-  FaLocationDot,
-  FaMagnifyingGlass,
-  FaRotateLeft,
-} from 'react-icons/fa6'
-import StatusBadge from '../components/ui/StatusBadge'
+import { useSearchParams } from 'react-router-dom'
+import { FaMagnifyingGlass, FaRotateLeft } from 'react-icons/fa6'
+import SearchResultCard from '../components/search/SearchResultCard'
 import { mockItems } from '../data/dashboardData'
 
 const defaultFilters = {
@@ -29,14 +22,6 @@ function filtersFromParams(searchParams) {
     timeframe: searchParams.get('timeframe') || defaultFilters.timeframe,
     sort: searchParams.get('sort') || defaultFilters.sort,
   }
-}
-
-function formatReportedDate(value) {
-  return new Intl.DateTimeFormat('en-PH', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  }).format(new Date(value))
 }
 
 function SearchItems() {
@@ -196,34 +181,7 @@ function SearchItems() {
 
         {filteredItems.length > 0 ? (
           <div className="search-results-grid">
-            {filteredItems.map((item) => (
-              <Link className="search-result-card" to={`/items/${item.id}`} key={item.id}>
-                <div className={`item-visual item-visual-${item.reportType}`} aria-hidden="true">
-                  <FaBoxOpen />
-                </div>
-                <div className="result-card-content">
-                  <div className="result-card-labels">
-                    <span className={`report-type report-type-${item.reportType}`}>
-                      {item.reportType === 'lost' ? 'Lost' : 'Found'}
-                    </span>
-                    <StatusBadge status={item.status} />
-                  </div>
-                  <h3>{item.name}</h3>
-                  <p>{item.description}</p>
-                  <dl className="result-card-meta">
-                    <div>
-                      <dt><FaLocationDot aria-hidden="true" /><span className="sr-only">Location</span></dt>
-                      <dd>{item.location}</dd>
-                    </div>
-                    <div>
-                      <dt><FaCalendar aria-hidden="true" /><span className="sr-only">Reported</span></dt>
-                      <dd>{formatReportedDate(item.reportedAt)}</dd>
-                    </div>
-                  </dl>
-                  <span className="view-details">View details <FaChevronRight aria-hidden="true" /></span>
-                </div>
-              </Link>
-            ))}
+            {filteredItems.map((item) => <SearchResultCard item={item} key={item.id} />)}
           </div>
         ) : (
           <div className="search-empty-state">

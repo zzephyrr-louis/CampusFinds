@@ -1,5 +1,3 @@
-import React from 'react';
-
 function MatchLogs({ logs }) {
     return (
         <div className="match-logs-container">

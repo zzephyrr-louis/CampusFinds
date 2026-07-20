@@ -1,5 +1,3 @@
-import React from 'react';
-
 function StatisticsCards({ stats }) {
     return (
         <div className="statistics-cards">
