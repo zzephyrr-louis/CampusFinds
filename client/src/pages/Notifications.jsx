@@ -2,11 +2,21 @@ import { useEffect, useMemo, useState } from 'react'
 import { FaCheckDouble } from 'react-icons/fa6'
 import { useNotifications } from '../context/useNotifications'
 import NotificationItem from '../components/notification/NotificationItem'
+import PageHeader from '../components/ui/PageHeader'
 import './Notifications.css'
 
 function Notifications() {
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
+  const {
+    notifications,
+    unreadCount,
+    isLoading,
+    error,
+    markAsRead,
+    markAllAsRead,
+    refreshNotifications,
+  } = useNotifications()
   const [filter, setFilter] = useState('all')
+  const [isMarkingAll, setIsMarkingAll] = useState(false)
 
   useEffect(() => {
     document.title = 'Notifications | CampusFind'
@@ -17,11 +27,26 @@ function Notifications() {
     [filter, notifications],
   )
 
+  async function handleMarkAllAsRead() {
+    setIsMarkingAll(true)
+    await markAllAsRead()
+    setIsMarkingAll(false)
+  }
+
   return (
     <section className="notifications-page" aria-labelledby="notifications-title">
-      <h1 className="sr-only" id="notifications-title">
-        Notifications
-      </h1>
+      <PageHeader
+        eyebrow="Campus activity"
+        title="Notifications"
+        titleId="notifications-title"
+        description="Keep track of item matches, claim updates, and important CampusFind activity."
+        aside={(
+          <div className="page-metric" aria-label={`${unreadCount} unread notifications`}>
+            <strong>{unreadCount}</strong>
+            <span>{unreadCount === 1 ? 'unread update' : 'unread updates'}</span>
+          </div>
+        )}
+      />
 
       <div className="notifications-card">
         <div className="notification-toolbar" aria-label="Filter notifications">
@@ -49,16 +74,23 @@ function Notifications() {
           <button
             className="mark-all-button"
             type="button"
-            onClick={markAllAsRead}
-            disabled={unreadCount === 0}
+            onClick={handleMarkAllAsRead}
+            disabled={unreadCount === 0 || isMarkingAll}
           >
             <FaCheckDouble aria-hidden="true" />
-            Mark all as read
+            {isMarkingAll ? 'Updating…' : 'Mark all as read'}
           </button>
         </div>
 
         <div className="notification-results" aria-live="polite">
-          {visibleNotifications.length === 0 ? (
+          {isLoading ? (
+            <div className="page-loading-state" role="status">Loading notifications&hellip;</div>
+          ) : error ? (
+            <div className="page-error-state" role="alert">
+              <p>{error}</p>
+              <button className="secondary-button" type="button" onClick={() => refreshNotifications()}>Try again</button>
+            </div>
+          ) : visibleNotifications.length === 0 ? (
             <p className="empty-state">
               {filter === 'unread' ? "You're all caught up. No unread notifications." : 'No notifications yet.'}
             </p>

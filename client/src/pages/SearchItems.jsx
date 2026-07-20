@@ -1,8 +1,10 @@
-import { useEffect, useMemo } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { FaMagnifyingGlass, FaRotateLeft } from 'react-icons/fa6'
 import SearchResultCard from '../components/search/SearchResultCard'
-import { mockItems } from '../data/dashboardData'
+import PageHeader from '../components/ui/PageHeader'
+import api from '../services/api'
+import { asArray, toItemView } from '../services/mappers'
 
 const defaultFilters = {
   q: '',
@@ -27,33 +29,57 @@ function filtersFromParams(searchParams) {
 function SearchItems() {
   const [searchParams, setSearchParams] = useSearchParams()
   const filters = filtersFromParams(searchParams)
+  const [items, setItems] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const loadItems = useCallback(async ({ signal } = {}) => {
+    setIsLoading(true)
+    setError('')
+    try {
+      const response = await api.get('/items', { signal })
+      setItems(asArray(response.data, 'items').map(toItemView))
+    } catch (requestError) {
+      if (requestError.name !== 'AbortError') {
+        setError(requestError.response?.data?.message || 'Unable to load item reports.')
+      }
+    } finally {
+      if (!signal?.aborted) setIsLoading(false)
+    }
+  }, [])
 
   useEffect(() => {
     document.title = 'Search Items | CampusFind'
-  }, [])
+    const controller = new AbortController()
+    const loadTimer = window.setTimeout(() => loadItems({ signal: controller.signal }), 0)
+    return () => {
+      window.clearTimeout(loadTimer)
+      controller.abort()
+    }
+  }, [loadItems])
 
   const categories = useMemo(
-    () => [...new Set(mockItems.map((item) => item.category))].sort(),
-    [],
+    () => [...new Set(items.map((item) => item.category).filter(Boolean))].sort(),
+    [items],
   )
   const statuses = useMemo(
-    () => [...new Set(mockItems.map((item) => item.status))].sort(),
-    [],
+    () => [...new Set(items.map((item) => item.status).filter(Boolean))].sort(),
+    [items],
   )
 
   const filteredItems = useMemo(() => {
     const query = filters.q.trim().toLowerCase()
     const now = new Date()
 
-    return mockItems
+    return items
       .filter((item) => {
-        const searchableText = [
-          item.name,
-          item.category,
-          item.location,
-          item.description,
-        ].join(' ').toLowerCase()
-        const daysOld = (now - new Date(item.reportedAt)) / 86400000
+        const searchableText = [item.name, item.category, item.location, item.description]
+          .join(' ')
+          .toLowerCase()
+        const reportedDate = new Date(item.reportedAt)
+        const daysOld = Number.isNaN(reportedDate.getTime())
+          ? Number.POSITIVE_INFINITY
+          : (now - reportedDate) / 86400000
 
         return (
           (!query || searchableText.includes(query)) &&
@@ -67,7 +93,7 @@ function SearchItems() {
         const difference = new Date(second.reportedAt) - new Date(first.reportedAt)
         return filters.sort === 'oldest' ? -difference : difference
       })
-  }, [filters])
+  }, [filters, items])
 
   function updateFilter(event) {
     const { name, value } = event.target
@@ -78,11 +104,7 @@ function SearchItems() {
       if (filterValue && filterValue !== defaultFilters[key]) nextParams[key] = filterValue
     })
 
-    setSearchParams(nextParams, { replace: true })
-  }
-
-  function applyFilters(event) {
-    event.preventDefault()
+    setSearchParams(nextParams, { replace: name === 'q' })
   }
 
   function clearFilters() {
@@ -91,19 +113,19 @@ function SearchItems() {
 
   return (
     <div className="search-page">
-      <header className="page-heading">
-        <div>
-          <p className="eyebrow">Campus lost &amp; found</p>
-          <h1>Search items</h1>
-          <p>Browse recent reports and narrow the list using any details you remember.</p>
-        </div>
-        <div className="search-total" aria-label={`${filteredItems.length} reports found`}>
-          <strong>{filteredItems.length}</strong>
-          <span>{filteredItems.length === 1 ? 'report found' : 'reports found'}</span>
-        </div>
-      </header>
+      <PageHeader
+        eyebrow="Campus lost & found"
+        title="Search items"
+        description="Browse recent reports and narrow the list using any details you remember."
+        aside={(
+          <div className="page-metric" aria-label={`${filteredItems.length} reports found`}>
+            <strong>{filteredItems.length}</strong>
+            <span>{filteredItems.length === 1 ? 'report found' : 'reports found'}</span>
+          </div>
+        )}
+      />
 
-      <form className="search-filter-card" role="search" onSubmit={applyFilters}>
+      <form className="search-filter-card" role="search" onSubmit={(event) => event.preventDefault()}>
         <div className="search-keyword-field">
           <label htmlFor="item-search">What are you looking for?</label>
           <div>
@@ -161,12 +183,10 @@ function SearchItems() {
 
         <div className="filter-actions">
           <button className="primary-button" type="submit">
-            <FaMagnifyingGlass aria-hidden="true" />
-            Search reports
+            <FaMagnifyingGlass aria-hidden="true" /> Search reports
           </button>
           <button className="filter-reset" type="button" onClick={clearFilters}>
-            <FaRotateLeft aria-hidden="true" />
-            Clear filters
+            <FaRotateLeft aria-hidden="true" /> Clear filters
           </button>
         </div>
       </form>
@@ -175,11 +195,18 @@ function SearchItems() {
         <div className="results-heading">
           <div>
             <h2 id="results-title">Item reports</h2>
-            <p>{filters.q ? `Results matching “${filters.q}”` : 'All lost and found reports'}</p>
+            <p>{filters.q ? `Results matching "${filters.q}"` : 'All lost and found reports'}</p>
           </div>
         </div>
 
-        {filteredItems.length > 0 ? (
+        {isLoading ? (
+          <div className="page-loading-state" role="status">Loading item reports&hellip;</div>
+        ) : error ? (
+          <div className="page-error-state" role="alert">
+            <p>{error}</p>
+            <button className="secondary-button" type="button" onClick={() => loadItems()}>Try again</button>
+          </div>
+        ) : filteredItems.length > 0 ? (
           <div className="search-results-grid">
             {filteredItems.map((item) => <SearchResultCard item={item} key={item.id} />)}
           </div>

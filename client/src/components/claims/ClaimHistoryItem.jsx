@@ -1,36 +1,26 @@
-const STATUS_TONE = {
-  Pending: 'status-pending',
-  Approved: 'status-approved',
-  Rejected: 'status-rejected',
-}
+import StatusBadge from '../ui/StatusBadge'
 
 function formatDate(value) {
   if (!value) return '—'
   const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return value
+  if (Number.isNaN(date.getTime())) return '—'
   return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
 }
 
-function ClaimHistoryItem({ claim }) {
+function ClaimHistoryItem({ claim, isHighlighted = false }) {
   return (
-    <tr>
+    <tr className={isHighlighted ? 'is-highlighted' : ''}>
       <td>{claim.item?.item_name || '—'}</td>
       <td>{claim.item?.category || '—'}</td>
-      <td className="claims-reason-cell">{claim.reason}</td>
+      <td className="claims-reason-cell">{claim.reason || '—'}</td>
       <td>
         {claim.proof_image_url ? (
-          <img
-            src={claim.proof_image_url}
-            alt={`Proof for ${claim.item?.item_name || 'claim'}`}
-            className="claims-table-thumb"
-          />
-        ) : (
-          '—'
-        )}
+          <a href={claim.proof_image_url} target="_blank" rel="noreferrer">
+            <img src={claim.proof_image_url} alt={`Proof for ${claim.item?.item_name || 'claim'}`} className="claims-table-thumb" />
+          </a>
+        ) : '—'}
       </td>
-      <td>
-        <span className={`status-badge ${STATUS_TONE[claim.status] || ''}`}>{claim.status}</span>
-      </td>
+      <td><StatusBadge status={claim.status} /></td>
       <td>{formatDate(claim.created_at)}</td>
     </tr>
   )

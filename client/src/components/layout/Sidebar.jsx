@@ -48,8 +48,8 @@ function Sidebar({ isOpen, onClose }) {
       <div className="sidebar-footer">
         <span className="preview-dot" aria-hidden="true" />
         <div>
-          <strong>Frontend preview</strong>
-          <span>Using local mock data</span>
+          <strong>Campus records</strong>
+          <span>Changes are saved securely</span>
         </div>
       </div>
     </aside>

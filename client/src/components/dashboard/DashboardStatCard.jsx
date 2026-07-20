@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { FaArrowTrendUp } from 'react-icons/fa6'
+import { FaArrowRight } from 'react-icons/fa6'
 
 function DashboardStatCard({ stat }) {
   return (
@@ -7,7 +7,7 @@ function DashboardStatCard({ stat }) {
       <span>{stat.label}</span>
       <strong>{stat.value}</strong>
       <small>
-        <FaArrowTrendUp aria-hidden="true" />
+        <FaArrowRight aria-hidden="true" />
         {stat.detail}
       </small>
     </Link>

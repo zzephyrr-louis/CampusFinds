@@ -26,6 +26,10 @@ public class User {
     @Column(nullable = false)
     private String role = "student";
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    private UserStatus status = UserStatus.ACTIVE;
+
     public User() {
     }
 
@@ -83,5 +87,13 @@ public class User {
 
     public void setRole(String role) {
         this.role = role;
+    }
+
+    public UserStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(UserStatus status) {
+        this.status = status;
     }
 }

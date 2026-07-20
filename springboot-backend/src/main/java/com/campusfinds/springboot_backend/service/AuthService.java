@@ -6,6 +6,7 @@ import com.campusfinds.springboot_backend.dto.RegisterRequest;
 import com.campusfinds.springboot_backend.dto.UserDto;
 import com.campusfinds.springboot_backend.exception.ApiExceptions;
 import com.campusfinds.springboot_backend.model.User;
+import com.campusfinds.springboot_backend.model.UserStatus;
 import com.campusfinds.springboot_backend.repository.UserRepository;
 import com.campusfinds.springboot_backend.security.JwtUtil;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -54,6 +55,10 @@ public class AuthService {
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new ApiExceptions.InvalidCredentialsException("Invalid email or password.");
+        }
+
+        if (user.getStatus() != UserStatus.ACTIVE) {
+            throw new ApiExceptions.ForbiddenOperationException("This account is suspended.");
         }
 
         String token = jwtUtil.generateToken(user);
