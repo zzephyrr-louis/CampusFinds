@@ -146,7 +146,7 @@ CampusFind/
 `-- README.md               Setup, status, and team handoff guide
 ```
 
-Shared component areas:
+Component map:
 
 - `components/layout`: navbar, sidebar, and authenticated application shell
 - `components/auth`: reusable login and registration controls
@@ -156,8 +156,6 @@ Shared component areas:
 - `components/notification`: notification presentation and formatting
 - `components/adminpanel`: admin statistics, user table, and match logs
 - `components/ui`: shared section headers and status badges
-
-Coordinate before changing shared layout, routing, context, or UI components because several pages depend on them.
 
 ## Recent work summary
 
@@ -191,12 +189,11 @@ git switch -c your-branch-name
 
 For every feature, fix, or setup change:
 
-1. Keep edits within the feature's component/page area when possible.
-2. Run lint and build before requesting a merge.
-3. Update **Current project status** when functionality changes.
-4. Update **How to use the current app** or **API modes** when startup/configuration changes.
-5. Add a short entry to **Recent work summary** and update its date.
-6. Never add passwords, tokens, database files, `node_modules`, or generated build output.
+1. Run lint and build before requesting a merge.
+2. Update **Current project status** when functionality changes.
+3. Update **How to use the current app** or **API modes** when startup/configuration changes.
+4. Add a short entry to **Recent work summary** and update its date.
+5. Never add passwords, tokens, database files, `node_modules`, or generated build output.
 
 The README is part of the feature: a change is not complete if teammates cannot tell how to run or test it.
 
