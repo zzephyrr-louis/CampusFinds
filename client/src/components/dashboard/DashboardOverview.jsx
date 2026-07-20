@@ -1,6 +1,6 @@
-import { Link } from 'react-router-dom'
-import { FaArrowTrendUp, FaChartSimple } from 'react-icons/fa6'
+import { FaChartSimple } from 'react-icons/fa6'
 import SectionHeader from '../ui/SectionHeader'
+import DashboardStatCard from './DashboardStatCard'
 
 function DashboardOverview({ stats }) {
   return (
@@ -13,16 +13,7 @@ function DashboardOverview({ stats }) {
         icon={FaChartSimple}
       />
       <div className="stats-grid">
-        {stats.map((stat) => (
-          <Link className={`stat-card stat-${stat.tone}`} to={stat.to} key={stat.id}>
-            <span>{stat.label}</span>
-            <strong>{stat.value}</strong>
-            <small>
-              <FaArrowTrendUp aria-hidden="true" />
-              {stat.detail}
-            </small>
-          </Link>
-        ))}
+        {stats.map((stat) => <DashboardStatCard key={stat.id} stat={stat} />)}
       </div>
     </section>
   )
