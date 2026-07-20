@@ -3,7 +3,6 @@ import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { FaArrowRight, FaLock } from 'react-icons/fa6'
 import AuthLayout from '../components/auth/AuthLayout'
 import FormField from '../components/auth/FormField'
-import MockModeNotice from '../components/auth/MockModeNotice'
 import PasswordField from '../components/auth/PasswordField'
 import { useAuth } from '../context/useAuth'
 import api from '../services/api'
@@ -65,15 +64,6 @@ function Login() {
       title="Log in to your account"
       description="Enter your CampusFind account details to continue."
     >
-      <MockModeNotice />
-
-      {import.meta.env.VITE_API_MODE === 'mock' && (
-        <p className="demo-credentials">
-          Student: <strong>student@campusfind.local</strong> or admin:{' '}
-          <strong>admin@campusfind.local</strong>. Use any test password.
-        </p>
-      )}
-
       {serverMessage && (
         <p className="form-alert" role="alert">
           {serverMessage}
@@ -89,7 +79,7 @@ function Login() {
           value={formData.email}
           onChange={handleChange}
           autoComplete="email"
-          placeholder="student@campusfind.local"
+          placeholder="name@example.com"
           required
           error={errors.email}
           disabled={isSubmitting}

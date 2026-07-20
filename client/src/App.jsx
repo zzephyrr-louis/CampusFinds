@@ -29,8 +29,8 @@ function App() {
         <Route element={<AppShell />}>
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/account" element={<Account />} />
-          <Route path="/report-lost" element={<ReportItem type="lost" />} />
-          <Route path="/report-found" element={<ReportItem type="found" />} />
+          <Route path="/report-lost" element={<ReportItem key="lost-report" type="lost" />} />
+          <Route path="/report-found" element={<ReportItem key="found-report" type="found" />} />
           <Route path="/search-items" element={<SearchItems />} />
           <Route path="/items/:itemId" element={<ItemDetails />} />
           <Route path="/claims" element={<Claims />} />

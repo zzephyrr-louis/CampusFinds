@@ -1,183 +1,249 @@
 # CampusFind
 
-CampusFind is a campus lost-and-found application built with React. The current frontend supports mock authentication, a responsive dashboard, item search and details, notifications, and an admin panel. Lost/found reporting and claims are scaffolded for the next development phase.
+CampusFind is a campus lost-and-found system with a React frontend, a Spring Boot REST API, and MySQL persistence. Students can report, search, and claim items; administrators can review claims, manage users, and inspect recent system activity.
 
-## Quick start (recommended)
+The authoritative runtime is:
+
+- React production build served at `http://127.0.0.1:5173`
+- Spring Boot API at `http://127.0.0.1:8080/api`
+- MySQL database named `campusfind`
+
+The retired Express/SQLite server is not part of the application anymore.
+
+## Quick start on Windows
 
 ### Requirements
 
 - Windows 10 or 11
-- Node.js and npm available on `PATH`
+- Java 17 or newer on `PATH`
+- Node.js supported by Vite 8 (`20.19+` or `22.12+`) and npm on `PATH`
+- MySQL 8 running locally
 - A current checkout of this repository
 
-From the repository root, run:
+Configure MySQL and the environment variables described below, then run this from the repository root:
 
 ```powershell
 .\run.cmd
 ```
 
-You can also double-click `run.cmd` in File Explorer. The launcher:
+You can also double-click `run.cmd`. The launcher:
 
-1. Installs frontend dependencies when they are missing.
-2. Creates a clean production build.
-3. Serves the built app at `http://127.0.0.1:5173`.
-4. Opens the app in the default browser.
+1. Checks Java, Node.js, npm, and the required project files.
+2. Installs locked frontend dependencies with `npm ci` when needed.
+3. Builds React with the Spring API URL.
+4. Reuses a healthy Spring process or starts one on port `8080`.
+5. Waits until Spring and MySQL pass `GET /api/health`.
+6. Reuses the current production build or serves it on port `5173`.
+7. Opens CampusFind in the default browser.
 
-Keep the command window open while using CampusFind. Press `Ctrl+C` in that window to stop the app.
+Backend, frontend, and build output is written to the ignored `logs` directory. The two servers run in separate minimized command windows; close those windows to stop CampusFind.
 
-> The launcher intentionally uses `npm.cmd`, which works even when PowerShell blocks the `npm.ps1` wrapper.
+The launcher refuses to reuse an unrelated process on ports `8080` or `5173`. If it reports a port conflict, stop the existing process and run it again.
 
-## Demo accounts
+## MySQL setup
 
-The tracked `client/.env` uses mock mode, so no backend or database is required for the normal demo.
+The default configuration can create `campusfind` when the configured MySQL account has permission. A dedicated local account is safer than using `root`. Run the following once in MySQL Workbench or the MySQL client while connected as an administrator, replacing the sample password:
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Student | `student@campusfind.local` | Any test password |
-| Administrator | `admin@campusfind.local` | Any test password |
+```sql
+CREATE DATABASE IF NOT EXISTS campusfind
+  CHARACTER SET utf8mb4
+  COLLATE utf8mb4_unicode_ci;
 
-The administrator account can open the protected Admin Panel. Registration creates a student account in the current browser and signs it in immediately.
+CREATE USER IF NOT EXISTS 'campusfind_app'@'localhost'
+  IDENTIFIED BY 'replace-with-a-local-password';
 
-Mock accounts are stored in browser `localStorage`. Mock mode does not securely verify passwords, so never enter a real password.
+GRANT ALL PRIVILEGES ON campusfind.*
+  TO 'campusfind_app'@'localhost';
 
-## Current project status
+FLUSH PRIVILEGES;
+```
 
-| Area | Status | What is available |
-| --- | --- | --- |
-| Authentication | Working in mock mode | Login, registration, logout, protected routes, and role-based admin access |
-| Dashboard | Working | Responsive overview, lost/found summaries, statistics, and quick actions |
-| Item search | Working with mock data | Text search, filters, reusable result cards, and item-detail routes |
-| Notifications | Working with mock data | Notification list, formatting helpers, read-state interactions, and responsive styling |
-| Admin panel | Working as a frontend demo | Statistics, user edit/delete actions, responsive user table, and activity logs |
-| Report lost/found | Placeholder | Routes and page descriptions exist; forms and persistence still need implementation |
-| Claims | Placeholder | Route exists; claim submission, review, and status tracking still need implementation |
-| Backend integration | Partial | Authentication APIs exist, but the tracked frontend remains in mock mode |
-
-## How to use the current app
-
-1. Start CampusFind with `run.cmd`.
-2. Log in with a demo account or register a mock student account.
-3. Use the sidebar to open the dashboard, search, notifications, and account pages.
-4. Open a search result to view the item's details.
-5. Log in as the administrator to test user management and activity logs.
-6. Treat Report Lost Item, Report Found Item, and My Claims as integration placeholders for now.
-
-## Frontend development
-
-For hot reload during development:
+Set the connection values in the same PowerShell session that will launch CampusFind:
 
 ```powershell
-cd client
-npm.cmd install
-npm.cmd run dev
+$env:DB_URL = 'jdbc:mysql://localhost:3306/campusfind?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC'
+$env:DB_USERNAME = 'campusfind_app'
+$env:DB_PASSWORD = 'replace-with-a-local-password'
+$env:JWT_SECRET = 'replace-with-a-long-random-development-secret'
+.\run.cmd
 ```
 
-Open the URL printed by Vite, normally `http://localhost:5173`.
+These process variables are not written to the repository. Do not add real database passwords or JWT secrets to tracked files.
 
-Before committing frontend work, run:
+Hibernate uses `spring.jpa.hibernate.ddl-auto=update`: it creates or updates required tables without deleting existing records. The application persists data in these tables:
+
+| Table | Purpose and relationships |
+| --- | --- |
+| `users` | Unique student ID and email, BCrypt password, role, and account status |
+| `items` | Lost/found reports; each belongs to a reporter and can optionally reference a related report |
+| `item_claims` | Belongs to one item and claimant, optionally one reviewing admin; unique per item and claimant |
+| `notifications` | Belongs to one user and can reference an item or claim |
+| `activity_logs` | Records administrative/system activity and an optional actor |
+
+## Configuration reference
+
+Spring reads the following environment variables. Defaults are intended only for local development.
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `DB_URL` | `jdbc:mysql://localhost:3306/campusfind?createDatabaseIfNotExist=true&useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC` | JDBC connection URL |
+| `DB_USERNAME` | `root` | MySQL username |
+| `DB_PASSWORD` | `root` | MySQL password |
+| `JWT_SECRET` | Development-only fallback | Secret used to sign login tokens |
+| `JWT_EXPIRATION_MS` | `86400000` | Token lifetime in milliseconds |
+| `CORS_ALLOWED_ORIGINS` | `http://localhost:5173,http://127.0.0.1:5173` | Comma-separated frontend origins |
+| `UPLOAD_DIR` | `uploads` | Image storage directory, relative to `springboot-backend` when using the launcher |
+| `JPA_SHOW_SQL` | `false` | Log SQL statements |
+| `JPA_FORMAT_SQL` | `false` | Format logged SQL |
+| `ADMIN_STUDENT_ID` | `ADMIN-0001` | Optional bootstrap administrator ID |
+| `ADMIN_FULLNAME` | `CampusFind Administrator` | Optional bootstrap administrator name |
+| `ADMIN_EMAIL` | Empty | Administrator bootstrap is disabled when empty |
+| `ADMIN_PASSWORD` | Empty | Bootstrap password; must contain at least 8 characters |
+
+### Create the first administrator
+
+Public registration always creates a student. To create the first administrator in an empty database, set all bootstrap values before the first successful backend start:
 
 ```powershell
-cd client
-npm.cmd run lint
-npm.cmd run build
+$env:ADMIN_STUDENT_ID = 'ADMIN-0001'
+$env:ADMIN_FULLNAME = 'CampusFind Administrator'
+$env:ADMIN_EMAIL = 'admin@campusfind.local'
+$env:ADMIN_PASSWORD = 'replace-with-a-strong-password'
+.\run.cmd
 ```
 
-Both commands must pass before a branch is merged into `main`.
+Bootstrap is idempotent: it does not create another account when the email or student ID already exists. It does not reset an existing password. Clear the variables after the account has been created if you no longer need bootstrap.
 
-## API modes
+## Manual development commands
 
-The frontend reads its mode from `client/.env`:
+### Spring Boot API
 
-```dotenv
-VITE_API_MODE=mock
-VITE_API_URL=http://localhost:8080/api
+Run backend tests:
+
+```powershell
+cd springboot-backend
+.\mvnw.cmd clean test
 ```
 
-### Mock mode
-
-`VITE_API_MODE=mock` is the recommended mode while frontend features are being developed. Authentication responses, demo items, and notifications come from local browser data and files under `client/src/data`.
-
-### Spring Boot and MySQL
-
-The Spring Boot backend is in `springboot-backend` and is the backend selected by the tracked API URL.
-
-Requirements:
-
-- Java 17
-- MySQL running locally
-- Correct local database credentials and a secure JWT secret in `springboot-backend/src/main/resources/application.properties`
-
-Start it from the repository root:
+Start the API manually:
 
 ```powershell
 cd springboot-backend
 .\mvnw.cmd spring-boot:run
 ```
 
-Then set `VITE_API_MODE=server` in `client/.env` and restart the frontend. The Spring API uses port `8080`.
-
-Do not commit real database passwords or production JWT secrets.
-
-### Express and SQLite alternative
-
-An earlier Express/SQLite authentication backend remains in `server` and runs on port `5000` by default:
+The API is ready only when this returns HTTP 200:
 
 ```powershell
-cd server
-npm.cmd install
-npm.cmd start
+curl.exe http://127.0.0.1:8080/api/health
 ```
 
-To use it, set the frontend to server mode and change `VITE_API_URL` to `http://localhost:5000/api`, then restart the frontend. Run only the backend you intend to test.
+### React frontend
+
+For hot reload, open another PowerShell window:
+
+```powershell
+cd client
+$env:VITE_API_URL = 'http://127.0.0.1:8080/api'
+npm.cmd ci
+npm.cmd run dev
+```
+
+Before requesting a merge, run:
+
+```powershell
+cd client
+npm.cmd run lint
+$env:VITE_API_URL = 'http://127.0.0.1:8080/api'
+npm.cmd run build
+```
+
+To serve that production build without Vite's development server:
+
+```powershell
+npm.cmd run serve
+```
+
+## Main workflows
+
+### Student workflow
+
+1. Register or log in.
+2. Submit a lost-item or found-item report, with an optional image.
+3. Search and filter saved reports, then open an item for full details.
+4. Submit one ownership claim for an available item and review it in Claim History.
+5. Read notifications generated by matching and claim-review activity.
+
+Reports, claims, users, and notification read state are stored in MySQL and survive browser refreshes and server restarts.
+
+### Administrator workflow
+
+1. Log in with the bootstrapped administrator account.
+2. Review dashboard totals, recent reports, recent claims, and activity.
+3. Approve or reject pending claims with optional remarks.
+4. Edit, suspend, or delete user accounts where allowed; administrators can also create accounts through the documented API.
+5. Review the administrative activity log.
+
+The API enforces administrator-only operations server-side; hiding a frontend control is not the security boundary.
+
+## API overview
+
+Login and registration are public. The health endpoint is public so the launcher can verify MySQL. All other `/api` endpoints require a valid Bearer token; administrator operations additionally require the `admin` role.
+
+| Area | Method and path | Purpose |
+| --- | --- | --- |
+| Health | `GET /api/health` | API and database readiness |
+| Authentication | `POST /api/auth/register` | Create a student account |
+| Authentication | `POST /api/auth/login` | Authenticate and issue a JWT |
+| Authentication | `GET /api/auth/me` | Current authenticated user |
+| Items | `GET /api/items` | Search/filter items with `q`, `type`, `category`, `status`, `days`, and `sort` |
+| Items | `GET /api/items/lost` | Lost reports |
+| Items | `GET /api/items/found` | Found reports |
+| Items | `GET /api/items/claimable` | Items currently eligible for claims |
+| Items | `GET /api/items/{itemId}` | Item details |
+| Items | `POST /api/items` | Create a lost/found report |
+| Items | `POST /api/items/lost`, `POST /api/items/found` | Type-specific report aliases |
+| Items | `PUT /api/items/{itemId}` | Update an item when authorized |
+| Items | `PUT /api/items/{itemId}/status` | Update item status |
+| Items | `DELETE /api/items/{itemId}` | Delete an item when authorized |
+| Claims | `GET /api/claims` | All claims (administrator) |
+| Claims | `GET /api/claims/mine` | Current user's claim history |
+| Claims | `GET /api/claims/user/{userId}` | Claims for a user (administrator) |
+| Claims | `GET /api/claims/{claimId}` | Claim details when authorized |
+| Claims | `POST /api/claims` | Submit a claim |
+| Claims | `PUT /api/claims/{claimId}/approve` | Approve a pending claim (administrator) |
+| Claims | `PUT /api/claims/{claimId}/reject` | Reject a pending claim (administrator) |
+| Claims | `DELETE /api/claims/{claimId}` | Delete a claim when authorized |
+| Dashboard | `GET /api/dashboard/summary` | Item/claim totals and recent activity |
+| Notifications | `GET /api/notifications` | Current user's notifications |
+| Notifications | `GET /api/notifications/unread-count` | Current unread total |
+| Notifications | `PATCH /api/notifications/{id}/read` | Mark one notification read |
+| Notifications | `PATCH /api/notifications/read-all` | Mark all current-user notifications read |
+| Users | `GET /api/users` | List users (administrator) |
+| Users | `GET /api/users/me` | Current user profile |
+| Users | `GET /api/users/{userId}` | User details (administrator) |
+| Users | `POST /api/users` | Create a user (administrator) |
+| Users | `PUT /api/users/{userId}` | Update a user (administrator) |
+| Users | `DELETE /api/users/{userId}` | Delete a user (administrator) |
+| Activity | `GET /api/activity` | Recent activity (administrator) |
+| Files | `POST /api/files/upload` | Upload a validated item/claim image |
+
+Uploaded images are served from `/uploads/**`. Requests that fail validation return structured `400` responses; missing records return `404`; duplicate accounts or claims return `409`; unauthorized and forbidden requests return `401` and `403`.
 
 ## Project structure
 
 ```text
 CampusFind/
-|-- client/                 React frontend
-|   |-- src/components/     Shared and feature components
-|   |-- src/context/        Authentication and notification state
-|   |-- src/data/           Mock item and notification data
-|   |-- src/pages/          Route-level pages
-|   `-- src/services/       Mock/server API adapter
-|-- springboot-backend/     Spring Boot, MySQL, and JWT API
-|-- server/                 Alternative Express and SQLite API
-|-- run.cmd                 Windows production-build launcher
-`-- README.md               Setup, status, and team handoff guide
+|-- client/                 React pages, components, contexts, and API adapter
+|-- springboot-backend/     Spring controllers, services, repositories, JPA models, and tests
+|-- logs/                   Generated launcher logs (ignored)
+|-- run.cmd                 Integrated Windows production launcher
+`-- README.md               Setup, API, testing, and team handoff guide
 ```
 
-Component map:
+The old Express/SQLite source was removed so there is only one backend. A pre-existing local `server/database/*.sqlite` file remains ignored to avoid deleting a teammate's local data, but CampusFind does not read it.
 
-- `components/layout`: navbar, sidebar, and authenticated application shell
-- `components/auth`: reusable login and registration controls
-- `components/routing`: protected, public-only, and role-based routes
-- `components/dashboard`: dashboard sections, cards, actions, and item summaries
-- `components/search`: reusable item search results
-- `components/notification`: notification presentation and formatting
-- `components/adminpanel`: admin statistics, user table, and match logs
-- `components/ui`: shared section headers and status badges
-
-## Recent work summary
-
-Last updated: **2026-07-20**
-
-- Merged the latest teammate work into `main` and resolved the admin-panel conflicts (`6f566ed`).
-- Extracted reusable dashboard statistic, quick-action, item-summary, and search-result components (`dd5e3ca`).
-- Added responsive dashboard/search styling and improved the admin table's scrolling behavior.
-- Modularized the admin panel into statistics, user-management, and match-log components (`15209fa`, merged by `b66f2a1`).
-- Added the redesigned notification page, notification items, helper functions, mock data, and responsive styles.
-- Fixed obsolete React imports in the extracted admin components so lint and production builds pass.
-- Previously added mock-mode item search, filters, and item details (`588bf0c`).
-
-Next priorities:
-
-1. Implement the lost-item and found-item report forms.
-2. Implement the claims workflow and statuses.
-3. Choose the primary backend and connect item, notification, and claim features to it.
-4. Replace mock authentication with the selected backend after configuration is stable.
-5. Add automated tests for authentication, search, notifications, and admin actions.
-
-## Team workflow and README rule
+## Team workflow
 
 Start new work from the latest `main`:
 
@@ -189,37 +255,47 @@ git switch -c your-branch-name
 
 For every feature, fix, or setup change:
 
-1. Run lint and build before requesting a merge.
-2. Update **Current project status** when functionality changes.
-3. Update **How to use the current app** or **API modes** when startup/configuration changes.
-4. Add a short entry to **Recent work summary** and update its date.
-5. Never add passwords, tokens, database files, `node_modules`, or generated build output.
-
-The README is part of the feature: a change is not complete if teammates cannot tell how to run or test it.
+1. Run frontend lint/build and backend tests before requesting a merge.
+2. Update this README when setup, routes, configuration, or workflows change.
+3. Never commit passwords, tokens, database files, uploaded user files, `node_modules`, Maven `target`, or generated frontend builds.
+4. Keep controllers focused on HTTP handling, business logic in services, and persistence in repositories.
 
 ## Troubleshooting
 
-### PowerShell says running scripts is disabled
+### The launcher says Spring did not become ready
 
-Use `npm.cmd`, not `npm`:
+Open `logs/backend.log`, then confirm:
 
-```powershell
-npm.cmd run dev
-```
+- MySQL is running.
+- `DB_URL`, `DB_USERNAME`, and `DB_PASSWORD` are correct.
+- The configured user has access to the `campusfind` database.
+- Port `8080` is free.
 
-### Port 5173 is already in use
+The health endpoint intentionally returns `503` when the database is unavailable.
 
-`run.cmd` opens an existing CampusFind server when it detects one. Otherwise, stop the other process using port `5173` and run the launcher again.
+### Port 5173 is occupied by an outdated frontend
 
-### Mock login or registration has stale data
+Stop the existing Vite or Node process, then run `run.cmd` again. The launcher compares the served HTML with the build it just created and does not silently reuse an old build.
 
-Log out and clear the CampusFind site data in the browser. The relevant `localStorage` entries are `campusfind_user`, `campusfind_token`, and `campusfind_mock_users`.
+### Administrator bootstrap did not create an account
 
-### Server mode cannot connect
+Check `logs/backend.log`. `ADMIN_EMAIL` must be non-empty, `ADMIN_PASSWORD` must contain at least 8 characters, and neither the configured email nor student ID can already exist.
 
-Confirm that:
+### PowerShell blocks npm scripts
 
-- `VITE_API_MODE` is `server`.
-- `VITE_API_URL` matches the backend port.
-- The backend and its database are running.
-- The frontend was restarted after editing `client/.env`.
+Use `npm.cmd` as shown in this README; it avoids PowerShell's `npm.ps1` execution-policy wrapper.
+
+### Uploaded images are missing
+
+Check `UPLOAD_DIR` and filesystem permissions. The default launcher location is `springboot-backend/uploads`, which is intentionally ignored by Git.
+
+## Sprint 3/4 handoff
+
+Last updated: **2026-07-20**
+
+- Spring Boot/MySQL is the single backend and owns authentication, users, items, claims, notifications, activity, uploads, and dashboard summaries.
+- Frontend API calls target the Spring endpoints; the integrated launcher builds in server mode.
+- Dashboard, reports, search/details, claims, notifications, and administrator workflows use persisted API data.
+- Validation, centralized API errors, JWT authentication, role checks, duplicate-claim prevention, and item availability rules are enforced server-side.
+- Legacy Express/SQLite source and mock-only runtime documentation were removed.
+- `run.cmd` now builds, starts, health-checks, logs, and opens the two-application stack.

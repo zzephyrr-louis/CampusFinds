@@ -3,7 +3,6 @@ import { Link, useNavigate } from 'react-router-dom'
 import { FaArrowRight, FaUserPlus } from 'react-icons/fa6'
 import AuthLayout from '../components/auth/AuthLayout'
 import FormField from '../components/auth/FormField'
-import MockModeNotice from '../components/auth/MockModeNotice'
 import PasswordField from '../components/auth/PasswordField'
 import { useAuth } from '../context/useAuth'
 import api from '../services/api'
@@ -66,10 +65,8 @@ function Register() {
     <AuthLayout
       eyebrow="Student registration"
       title="Create your CampusFind account"
-      description="Use test information while the app is running in frontend preview mode."
+      description="Use your campus details to create a secure account."
     >
-      <MockModeNotice />
-
       {serverMessage && (
         <p className="form-alert" role="alert">
           {serverMessage}

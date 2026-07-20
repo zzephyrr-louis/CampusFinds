@@ -7,6 +7,7 @@ import org.springframework.web.servlet.config.annotation.ResourceHandlerRegistry
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 import java.nio.file.Paths;
+import java.util.Arrays;
 
 @Configuration
 public class WebConfig implements WebMvcConfigurer {
@@ -19,8 +20,12 @@ public class WebConfig implements WebMvcConfigurer {
 
     @Override
     public void addCorsMappings(CorsRegistry registry) {
+        String[] origins = Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(origin -> !origin.isEmpty())
+                .toArray(String[]::new);
         registry.addMapping("/api/**")
-                .allowedOrigins(allowedOrigins.split(","))
+                .allowedOrigins(origins)
                 .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
                 .allowedHeaders("*")
                 .allowCredentials(true);
@@ -30,8 +35,11 @@ public class WebConfig implements WebMvcConfigurer {
     public void addResourceHandlers(ResourceHandlerRegistry registry) {
         // Serves files saved under the upload directory at http://localhost:8080/uploads/...
         // e.g. uploads/student-ids/abc123.jpg -> /uploads/student-ids/abc123.jpg
-        String absoluteUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize().toString();
+        String absoluteUploadPath = Paths.get(uploadDir).toAbsolutePath().normalize().toUri().toString();
+        if (!absoluteUploadPath.endsWith("/")) {
+            absoluteUploadPath += "/";
+        }
         registry.addResourceHandler("/uploads/**")
-                .addResourceLocations("file:" + absoluteUploadPath + "/");
+                .addResourceLocations(absoluteUploadPath);
     }
 }

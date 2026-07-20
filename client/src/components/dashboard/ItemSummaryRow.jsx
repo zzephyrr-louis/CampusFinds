@@ -3,6 +3,10 @@ import { FaLocationDot } from 'react-icons/fa6'
 import StatusBadge from '../ui/StatusBadge'
 
 function ItemSummaryRow({ item }) {
+  const reportedDate = item.reportedAt
+    ? new Intl.DateTimeFormat('en-PH', { dateStyle: 'medium' }).format(new Date(item.reportedAt))
+    : 'Date unavailable'
+
   return (
     <Link className="item-summary-row" to={`/items/${item.id}`}>
       <span className="item-summary-main">
@@ -15,7 +19,7 @@ function ItemSummaryRow({ item }) {
       </span>
       <span className="item-summary-meta">
         <StatusBadge status={item.status} />
-        <time dateTime={item.reportedAt}>{item.displayDate}</time>
+        <time dateTime={item.reportedAt}>{reportedDate}</time>
       </span>
     </Link>
   )

@@ -1,73 +1,110 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/useAuth'
 import api from '../services/api'
-import { claimableItems as mockClaimableItems, claimHistory as mockClaimHistory } from '../data/claimData'
+import { asArray, toClaimView, toItemView } from '../services/mappers'
 import SubmitClaimCard from '../components/claims/SubmitClaimCard'
 import ClaimHistoryCard from '../components/claims/ClaimHistoryCard'
+import PageHeader from '../components/ui/PageHeader'
 import './Claims.css'
 
-function Claims() {
-  useAuth()
+function toClaimableItem(item) {
+  const view = toItemView(item)
+  return {
+    item_id: view.itemId,
+    item_name: view.name,
+    category: view.category,
+    status: view.status,
+    reporter_id: view.reporterId,
+  }
+}
 
+function Claims() {
+  const { user } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const requestedItemId = searchParams.get('itemId') || ''
+  const requestedClaimId = searchParams.get('claimId') || ''
   const [items, setItems] = useState([])
   const [claims, setClaims] = useState([])
   const [isLoadingItems, setIsLoadingItems] = useState(true)
   const [isLoadingClaims, setIsLoadingClaims] = useState(true)
   const [loadError, setLoadError] = useState('')
-  const [showHistory, setShowHistory] = useState(false)
-
+  const [showHistory, setShowHistory] = useState(Boolean(requestedClaimId))
   const [formData, setFormData] = useState({ item_id: '', reason: '' })
   const [formErrors, setFormErrors] = useState({})
   const [serverMessage, setServerMessage] = useState('')
   const [successMessage, setSuccessMessage] = useState('')
   const [isSubmitting, setIsSubmitting] = useState(false)
-
   const [proofImage, setProofImage] = useState(null)
   const [proofImagePreview, setProofImagePreview] = useState('')
+  const [proofInputKey, setProofInputKey] = useState(0)
   const [imageError, setImageError] = useState('')
+
+  const loadClaimsData = useCallback(async ({ signal } = {}) => {
+    setIsLoadingItems(true)
+    setIsLoadingClaims(true)
+    setLoadError('')
+
+    const [itemsResult, claimsResult] = await Promise.allSettled([
+      api.get('/items/claimable', { signal }),
+      api.get('/claims/mine', { signal }),
+    ])
+
+    if (signal?.aborted) return
+    const messages = []
+
+    let availableItems = []
+    let claimRecords = []
+
+    if (itemsResult.status === 'fulfilled') {
+      availableItems = asArray(itemsResult.value.data, 'items').map(toClaimableItem)
+    } else if (itemsResult.reason.name !== 'AbortError') {
+      messages.push(itemsResult.reason.response?.data?.message || 'Unable to load claimable items.')
+    }
+
+    if (claimsResult.status === 'fulfilled') {
+      claimRecords = asArray(claimsResult.value.data, 'claims').map(toClaimView)
+    } else if (claimsResult.reason.name !== 'AbortError') {
+      messages.push(claimsResult.reason.response?.data?.message || 'Unable to load your claim history.')
+    }
+
+    const claimedItemIds = new Set(claimRecords.map((claim) => String(claim.item?.item_id)))
+    availableItems = availableItems.filter((item) =>
+      String(item.reporter_id) !== String(user?.user_id) &&
+      !claimedItemIds.has(String(item.item_id)),
+    )
+    setItems(availableItems)
+    setClaims(claimRecords)
+
+    if (requestedItemId) {
+      const requestedItem = availableItems.find(
+        (item) => String(item.item_id) === String(requestedItemId),
+      )
+      if (requestedItem) {
+        setFormData((current) => ({ ...current, item_id: String(requestedItem.item_id) }))
+      }
+    }
+
+    setLoadError(messages.join(' '))
+    setIsLoadingItems(false)
+    setIsLoadingClaims(false)
+  }, [requestedItemId, user?.user_id])
 
   useEffect(() => {
     document.title = 'My Claims | CampusFind'
-    loadClaimableItems()
-    loadClaimHistory()
+    const controller = new AbortController()
+    const loadTimer = window.setTimeout(() => loadClaimsData({ signal: controller.signal }), 0)
+    return () => {
+      window.clearTimeout(loadTimer)
+      controller.abort()
+    }
+  }, [loadClaimsData])
 
-    // Clean up the object URL when the component unmounts.
+  useEffect(() => {
     return () => {
       if (proofImagePreview) URL.revokeObjectURL(proofImagePreview)
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
-
-  async function loadClaimableItems() {
-    try {
-      setIsLoadingItems(true)
-      const response = await api.get('/items/claimable')
-      const data = Array.isArray(response.data) ? response.data : []
-      setItems(data.length > 0 ? data : mockClaimableItems)
-    } catch (error) {
-      // Fall back to local mock data so the form/page still works
-      // (useful for local dev/testing before the backend route is live).
-      setItems(mockClaimableItems)
-      setLoadError(error.response?.data?.message || 'Unable to load claimable items — showing sample data.')
-    } finally {
-      setIsLoadingItems(false)
-    }
-  }
-
-  async function loadClaimHistory() {
-    try {
-      setIsLoadingClaims(true)
-      const response = await api.get('/claims/mine')
-      const data = Array.isArray(response.data) ? response.data : []
-      setClaims(data.length > 0 ? data : mockClaimHistory)
-    } catch (error) {
-      // Same fallback strategy for claim history.
-      setClaims(mockClaimHistory)
-      setLoadError(error.response?.data?.message || 'Unable to load your claim history — showing sample data.')
-    } finally {
-      setIsLoadingClaims(false)
-    }
-  }
+  }, [proofImagePreview])
 
   function handleChange(event) {
     const { name, value } = event.target
@@ -80,30 +117,26 @@ function Claims() {
   function handleImageChange(event) {
     const file = event.target.files?.[0]
     setImageError('')
+    if (proofImagePreview) URL.revokeObjectURL(proofImagePreview)
 
     if (!file) {
       setProofImage(null)
       setProofImagePreview('')
       return
     }
-
-    if (!file.type.startsWith('image/')) {
-      setImageError('Please upload an image file (JPG, PNG, or WEBP).')
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setImageError('Please upload a JPG, PNG, or WEBP image.')
       event.target.value = ''
       return
     }
-
     if (file.size > 5 * 1024 * 1024) {
-      setImageError('Image must be smaller than 5MB.')
+      setImageError('Image must be 5MB or smaller.')
       event.target.value = ''
       return
     }
 
     setProofImage(file)
-    setProofImagePreview((current) => {
-      if (current) URL.revokeObjectURL(current)
-      return URL.createObjectURL(file)
-    })
+    setProofImagePreview(URL.createObjectURL(file))
   }
 
   function handleRemoveImage() {
@@ -111,15 +144,25 @@ function Claims() {
     setProofImage(null)
     setProofImagePreview('')
     setImageError('')
+    setProofInputKey((current) => current + 1)
   }
 
   function validate() {
     const nextErrors = {}
-    if (!formData.item_id) nextErrors.item_id = 'Select which item you\u2019re claiming.'
-    if (!formData.reason.trim() || formData.reason.trim().length < 10) {
-      nextErrors.reason = 'Give a bit more detail (at least 10 characters) so admins can verify your claim.'
+    if (!formData.item_id) nextErrors.item_id = 'Select which item you are claiming.'
+    if (formData.reason.trim().length < 10) {
+      nextErrors.reason = 'Give at least 10 characters of identifying detail so admins can verify your claim.'
     }
     return nextErrors
+  }
+
+  function closeHistory() {
+    setShowHistory(false)
+    if (requestedClaimId) {
+      const nextParams = new URLSearchParams(searchParams)
+      nextParams.delete('claimId')
+      setSearchParams(nextParams, { replace: true })
+    }
   }
 
   async function handleSubmit(event) {
@@ -128,57 +171,36 @@ function Claims() {
     setFormErrors(nextErrors)
     setServerMessage('')
     setSuccessMessage('')
-
     if (Object.keys(nextErrors).length > 0) return
-
-    const claimedItem = items.find((item) => String(item.item_id) === String(formData.item_id))
 
     try {
       setIsSubmitting(true)
-
-      let response
+      let proofImageUrl = null
       if (proofImage) {
-        const payload = new FormData()
-        payload.append('item_id', Number(formData.item_id))
-        payload.append('reason', formData.reason.trim())
-        payload.append('proof_image', proofImage)
-        response = await api.post('/claims', payload)
-    } else {
-        response = await api.post('/claims', {
-            item_id: Number(formData.item_id),
-            reason: formData.reason.trim(),
-        })
-    }
+        const uploadResponse = await api.uploadFile(proofImage, 'claim-proofs')
+        proofImageUrl = uploadResponse.data?.url || uploadResponse.data?.file_url || null
+        if (!proofImageUrl) throw new Error('The proof upload did not return a file URL.')
+      }
 
-      // Use whatever the server sends back if it looks like a claim record;
-      // otherwise build one locally so the UI updates immediately either way.
-      const returned = response?.data?.claim || response?.data
-      const newClaim =
-        returned && returned.claim_id
-          ? returned
-          : {
-              claim_id: `local-${Date.now()}`,
-              item: claimedItem
-                ? { item_id: claimedItem.item_id, item_name: claimedItem.item_name, category: claimedItem.category }
-                : null,
-              reason: formData.reason.trim(),
-              status: 'Pending',
-              created_at: new Date().toISOString(),
-              proof_image_url: proofImagePreview || null,
-            }
+      const response = await api.post('/claims', {
+        item_id: Number.isNaN(Number(formData.item_id)) ? formData.item_id : Number(formData.item_id),
+        reason: formData.reason.trim(),
+        proof_image_url: proofImageUrl,
+      })
+      const newClaim = toClaimView(response.data?.claim || response.data)
 
-      // Real-time update: prepend the new claim and drop the item from the
-      // claimable list right away, without waiting on a refetch.
-      setClaims((current) => [newClaim, ...current])
-      setItems((current) => current.filter((item) => String(item.item_id) !== String(formData.item_id)))
-
+      setClaims((current) => [newClaim, ...current.filter(
+        (claim) => String(claim.claim_id) !== String(newClaim.claim_id),
+      )])
+      setItems((current) => current.filter(
+        (item) => String(item.item_id) !== String(formData.item_id),
+      ))
       setSuccessMessage('Your claim was submitted. An admin will review it soon.')
       setFormData({ item_id: '', reason: '' })
-      setProofImage(null)
-      setProofImagePreview('')
-    } catch (error) {
-      setServerMessage(error.response?.data?.message || 'Unable to submit your claim. Please try again.')
-      setFormErrors(error.response?.data?.errors || {})
+      handleRemoveImage()
+    } catch (requestError) {
+      setServerMessage(requestError.response?.data?.message || 'Unable to submit your claim. Please try again.')
+      setFormErrors(requestError.response?.data?.errors || {})
     } finally {
       setIsSubmitting(false)
     }
@@ -186,22 +208,26 @@ function Claims() {
 
   return (
     <div className="claims-page">
-      <header className="claims-header">
-        <h1>My Claims</h1>
-      </header>
+      <PageHeader
+        eyebrow="Ownership verification"
+        title="My claims"
+        description="Submit proof for an item you recognize, then follow its review status in your claim history."
+      />
 
       {loadError && (
-        <p className="form-alert claims-page-alert" role="alert">
-          {loadError}
-        </p>
+        <div className="page-error-state claims-page-alert" role="alert">
+          <p>{loadError}</p>
+          <button className="secondary-button" type="button" onClick={() => loadClaimsData()}>Try again</button>
+        </div>
       )}
 
       <div className="claims-body">
-        {showHistory ? (
+        {showHistory || Boolean(requestedClaimId) ? (
           <ClaimHistoryCard
             claims={claims}
             isLoadingClaims={isLoadingClaims}
-            onBack={() => setShowHistory(false)}
+            highlightedClaimId={requestedClaimId}
+            onBack={closeHistory}
           />
         ) : (
           <SubmitClaimCard
@@ -214,6 +240,7 @@ function Claims() {
             isSubmitting={isSubmitting}
             proofImage={proofImage}
             proofImagePreview={proofImagePreview}
+            proofInputKey={proofInputKey}
             imageError={imageError}
             onChange={handleChange}
             onImageChange={handleImageChange}

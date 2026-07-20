@@ -3,7 +3,9 @@ package com.campusfinds.springboot_backend.controller;
 import com.campusfinds.springboot_backend.dto.AuthResponse;
 import com.campusfinds.springboot_backend.dto.LoginRequest;
 import com.campusfinds.springboot_backend.dto.RegisterRequest;
+import com.campusfinds.springboot_backend.dto.UserDto;
 import com.campusfinds.springboot_backend.service.AuthService;
+import com.campusfinds.springboot_backend.service.CurrentUserService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -15,9 +17,11 @@ import org.springframework.web.bind.annotation.*;
 public class AuthController {
 
     private final AuthService authService;
+    private final CurrentUserService currentUserService;
 
-    public AuthController(AuthService authService) {
+    public AuthController(AuthService authService, CurrentUserService currentUserService) {
         this.authService = authService;
+        this.currentUserService = currentUserService;
     }
 
     @PostMapping("/register")
@@ -30,5 +34,10 @@ public class AuthController {
     public ResponseEntity<AuthResponse> login(@Valid @RequestBody LoginRequest request) {
         AuthResponse response = authService.login(request);
         return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/me")
+    public ResponseEntity<UserDto> me() {
+        return ResponseEntity.ok(UserDto.from(currentUserService.requireCurrentUser()));
     }
 }

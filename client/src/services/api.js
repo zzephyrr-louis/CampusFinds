@@ -1,198 +1,106 @@
-import { readStoredJson, writeStoredJson } from '../utils/storage'
- 
-const baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
-const apiMode = import.meta.env.VITE_API_MODE || 'mock'
-const mockUsersKey = 'campusfind_mock_users'
-const mockReportsKey = 'campusfind_mock_reports'
- 
-const demoUsers = [
-  {
-    user_id: 'demo-student',
-    student_id: 'DEMO-001',
-    fullname: 'Demo Student',
-    email: 'student@campusfind.local',
-    role: 'student',
-  },
-  {
-    user_id: 'demo-admin',
-    student_id: 'ADMIN-001',
-    fullname: 'Demo Administrator',
-    email: 'admin@campusfind.local',
-    role: 'admin',
-  },
-]
- 
-function getMockUsers() {
-  const storedUsers = readStoredJson(mockUsersKey, [])
-  return Array.isArray(storedUsers) ? [...demoUsers, ...storedUsers] : demoUsers
+const baseURL = (import.meta.env.VITE_API_URL || 'http://localhost:8080/api').replace(/\/$/, '')
+
+function toSnakeCase(value) {
+  return value.replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
 }
- 
-function createApiError(message, status, errors) {
+
+function normalizeFieldErrors(errors) {
+  if (!errors || typeof errors !== 'object' || Array.isArray(errors)) return errors
+
+  return Object.fromEntries(
+    Object.entries(errors).map(([key, value]) => [toSnakeCase(key), value]),
+  )
+}
+
+function createApiError(message, status = 0, errors) {
   const error = new Error(message)
-  error.response = { data: { message, errors }, status }
+  error.response = {
+    data: { message, errors: normalizeFieldErrors(errors) },
+    status,
+  }
   return error
 }
- 
-function createMockSession(user, message) {
-  return {
-    data: {
-      message,
-      token: `campusfind-mock-token-${user.user_id}`,
-      user,
-    },
-  }
-}
- 
-function mockLogin(body) {
-  const email = body.email?.trim().toLowerCase()
-  const user = getMockUsers().find((candidate) => candidate.email === email)
- 
-  if (!user) {
-    throw createApiError('No mock account was found for that email.', 401)
-  }
- 
-  return createMockSession(user, 'Mock login successful.')
-}
- 
-function mockRegister(body) {
-  const email = body.email?.trim().toLowerCase()
-  const studentId = body.student_id?.trim()
-  const users = getMockUsers()
-  const duplicate = users.find((user) => user.email === email || user.student_id === studentId)
- 
-  if (duplicate) {
-    throw createApiError('An account with that email or student ID already exists.', 409)
-  }
- 
-  const user = {
-    user_id: `mock-${Date.now()}`,
-    student_id: studentId,
-    fullname: body.fullname.trim(),
-    email,
-    role: 'student',
-  }
-  const storedUsers = readStoredJson(mockUsersKey, [])
-  writeStoredJson(mockUsersKey, [...(Array.isArray(storedUsers) ? storedUsers : []), user])
- 
-  return createMockSession(user, 'Mock registration successful.')
-}
- 
-function mockSubmitClaim(body) {
-  if (!body.item_id) throw createApiError("Select which item you're claiming.", 400)
-  if (!body.reason || body.reason.trim().length < 10) {
-    throw createApiError('Give a bit more detail (at least 10 characters) so admins can verify your claim.', 400)
-  }
- 
-  return {
-    data: {
-      claim_id: `mock-claim-${Date.now()}`,
-      reason: body.reason.trim(),
-      status: 'Pending',
-      created_at: new Date().toISOString(),
-      item: { item_id: body.item_id, item_name: 'Mock item', category: 'General', status: 'Found' },
-      // Mock mode has no filesystem to store an upload in, so we just echo
-      // back that a file was attached (using the browser object URL if the
-      // caller passed one along) rather than silently dropping it.
-      proof_image_url: body.__mockProofImagePreview || null,
-    },
-  }
+
+function notifyUnauthorized(path) {
+  if (path.startsWith('/auth/login') || path.startsWith('/auth/register')) return
+  window.dispatchEvent(new CustomEvent('campusfind:unauthorized'))
 }
 
-function mockSubmitReport(body, type) {
-  if (!body.item_name?.trim() || !body.category || !body.event_date || !body.location?.trim()) {
-    throw createApiError('Complete the required item details before submitting.', 400)
-  }
-  if (!body.description?.trim() || body.description.trim().length < 15) {
-    throw createApiError('Please provide a more complete item description.', 400)
-  }
-  if (type === 'found' && (!body.condition || !body.storage_location?.trim())) {
-    throw createApiError('Include the item condition and storage location for a found report.', 400)
-  }
-
-  const item = {
-    item_id: `mock-${type}-${Date.now()}`,
-    ...body,
-    item_name: body.item_name.trim(),
-    location: body.location.trim(),
-    description: body.description.trim(),
-    report_type: type,
-    status: type === 'lost' ? 'Open' : 'Unclaimed',
-    created_at: new Date().toISOString(),
-  }
-  const reports = readStoredJson(mockReportsKey, [])
-  writeStoredJson(mockReportsKey, [item, ...(Array.isArray(reports) ? reports : [])])
-  return { data: { item } }
-}
- 
-async function mockRequest(path, options = {}) {
-  const method = options.method || 'GET'
- 
-  // FormData bodies (image uploads) can't be JSON.parsed — mock mode can't
-  // actually store a file, so pull out the plain fields it needs instead.
-  let body = {}
-  if (options.isFormData && options.body instanceof FormData) {
-    body = Object.fromEntries(
-      [...options.body.entries()].filter(([, value]) => !(value instanceof File)),
-    )
-  } else if (options.body) {
-    body = JSON.parse(options.body)
-  }
- 
-  if (method === 'POST' && path === '/auth/login') return mockLogin(body)
-  if (method === 'POST' && path === '/auth/register') return mockRegister(body)
-  if (method === 'GET' && path === '/items/claimable') return { data: [] }
-  if (method === 'POST' && path === '/claims') return mockSubmitClaim(body)
-  if (method === 'POST' && path === '/items/lost') return mockSubmitReport(body, 'lost')
-  if (method === 'POST' && path === '/items/found') return mockSubmitReport(body, 'found')
-  if (method === 'GET' && path === '/claims/mine') return { data: [] }
- 
-  throw createApiError(`No mock response is configured for ${path}.`, 404)
-}
- 
-async function serverRequest(path, options = {}) {
+async function request(path, options = {}) {
   const token = localStorage.getItem('campusfind_token')
-  const headers = { ...options.headers }
- 
-  // Only set Content-Type for JSON bodies. For FormData, the browser must
-  // generate its own Content-Type (with the multipart boundary) — setting
-  // it manually breaks the request.
-  if (!options.isFormData) {
+  const headers = { Accept: 'application/json', ...options.headers }
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData
+
+  if (options.body !== undefined && options.body !== null && !isFormData) {
     headers['Content-Type'] = 'application/json'
   }
- 
   if (token) headers.Authorization = `Bearer ${token}`
- 
-  const response = await fetch(`${baseURL}${path}`, {
-    method: options.method,
-    body: options.body,
-    headers,
-  })
-  const data = await response.json().catch(() => ({}))
- 
-  if (!response.ok) {
-    throw createApiError(data.message || 'Request failed.', response.status, data.errors)
-  }
- 
-  return { data }
-}
- 
-async function request(path, options = {}) {
-  return apiMode === 'mock' ? mockRequest(path, options) : serverRequest(path, options)
-}
- 
-const api = {
-  get(path) {
-    return request(path, { method: 'GET' })
-  },
-  post(path, body) {
-    const isFormData = typeof FormData !== 'undefined' && body instanceof FormData
- 
-    return request(path, {
-      method: 'POST',
-      body: isFormData ? body : JSON.stringify(body),
-      isFormData,
+
+  let response
+  try {
+    response = await fetch(`${baseURL}${path}`, {
+      ...options,
+      headers,
+      body:
+        options.body === undefined || options.body === null || isFormData
+          ? options.body
+          : JSON.stringify(options.body),
     })
+  } catch (error) {
+    if (error.name === 'AbortError') throw error
+    throw createApiError('Unable to connect to CampusFind. Check that the backend is running.')
+  }
+
+  const data = response.status === 204
+    ? null
+    : await response.json().catch(() => null)
+
+  if (!response.ok) {
+    if (response.status === 401 && token) notifyUnauthorized(path)
+    throw createApiError(
+      data?.message || `Request failed with status ${response.status}.`,
+      response.status,
+      data?.errors,
+    )
+  }
+
+  return { data, status: response.status }
+}
+
+export function resolveAssetUrl(value) {
+  if (!value || typeof value !== 'string') return ''
+  if (/^(?:https?:|data:|blob:)/i.test(value)) return value
+
+  try {
+    const apiOrigin = new URL(baseURL).origin
+    return new URL(value.startsWith('/') ? value : `/${value}`, apiOrigin).toString()
+  } catch {
+    return value
+  }
+}
+
+const api = {
+  get(path, options = {}) {
+    return request(path, { ...options, method: 'GET' })
+  },
+  post(path, body, options = {}) {
+    return request(path, { ...options, method: 'POST', body })
+  },
+  put(path, body, options = {}) {
+    return request(path, { ...options, method: 'PUT', body })
+  },
+  patch(path, body, options = {}) {
+    return request(path, { ...options, method: 'PATCH', body })
+  },
+  delete(path, options = {}) {
+    return request(path, { ...options, method: 'DELETE' })
+  },
+  async uploadFile(file, directory, options = {}) {
+    const payload = new FormData()
+    payload.append('file', file)
+    payload.append('directory', directory)
+    return request('/files/upload', { ...options, method: 'POST', body: payload })
   },
 }
- 
+
 export default api

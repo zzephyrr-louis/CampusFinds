@@ -18,6 +18,7 @@ public class UserDto {
     private String fullname;
     private String email;
     private String role;
+    private String status;
 
     public static UserDto from(User user) {
         UserDto dto = new UserDto();
@@ -26,6 +27,7 @@ public class UserDto {
         dto.fullname = user.getFullname();
         dto.email = user.getEmail();
         dto.role = user.getRole();
+        dto.status = user.getStatus() == null ? "ACTIVE" : user.getStatus().name();
         return dto;
     }
 
@@ -47,5 +49,9 @@ public class UserDto {
 
     public String getRole() {
         return role;
+    }
+
+    public String getStatus() {
+        return status;
     }
 }
