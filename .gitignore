@@ -15,7 +15,7 @@ dist-ssr
 # CampusFind generated files
 springboot-backend/uploads/
 
-# Preserve local data left by the retired Express/SQLite backend
+# Ignore any local data left by the retired Express/SQLite backend
 server/database/*.sqlite
 server/database/*.sqlite-*
 server/uploads/

@@ -241,7 +241,7 @@ CampusFind/
 `-- README.md               Setup, API, testing, and team handoff guide
 ```
 
-The old Express/SQLite source was removed so there is only one backend. A pre-existing local `server/database/*.sqlite` file remains ignored to avoid deleting a teammate's local data, but CampusFind does not read it.
+The old Express/SQLite source was removed so there is only one backend. Any local `server/database/*.sqlite` files remain ignored for safety, but CampusFind does not read them.
 
 ## Team workflow
 

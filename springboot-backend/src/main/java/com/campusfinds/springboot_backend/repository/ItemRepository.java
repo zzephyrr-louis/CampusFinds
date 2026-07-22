@@ -34,6 +34,10 @@ public interface ItemRepository extends JpaRepository<Item, Long> {
 
     boolean existsByReporterUserId(Long userId);
 
+    boolean existsByRelatedItemItemId(Long itemId);
+
+    boolean existsByImageUrlAndItemIdNot(String imageUrl, Long itemId);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select item from Item item where item.itemId = :itemId")
     Optional<Item> findByIdForUpdate(@Param("itemId") Long itemId);

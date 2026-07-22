@@ -97,6 +97,8 @@ if not errorlevel 1 (
 
   >>"%BACKEND_LOG%" echo.
   >>"%BACKEND_LOG%" echo ===== CampusFind backend start: %DATE% %TIME% =====
+  rem START does not reliably clear a nonzero ERRORLEVEL left by the port check.
+  call :clear_errorlevel
   start "CampusFind API - port 8080" /min "%ComSpec%" /d /c ""%~f0" --backend-child"
   if errorlevel 1 (
     echo The Spring Boot process could not be started.
@@ -130,6 +132,8 @@ if not errorlevel 1 (
 
   >>"%FRONTEND_LOG%" echo.
   >>"%FRONTEND_LOG%" echo ===== CampusFind frontend start: %DATE% %TIME% =====
+  rem START does not reliably clear a nonzero ERRORLEVEL left by the port check.
+  call :clear_errorlevel
   start "CampusFind Web - port 5173" /min "%ComSpec%" /d /c ""%~f0" --frontend-child"
   if errorlevel 1 (
     echo The built React server could not be started.
@@ -175,6 +179,9 @@ if errorlevel 1 (
   echo Missing prerequisite: %~2 is not installed or is not on PATH.
   exit /b 1
 )
+exit /b 0
+
+:clear_errorlevel
 exit /b 0
 
 :backend_ready

@@ -10,8 +10,11 @@ import com.campusfinds.springboot_backend.model.ReportType;
 import com.campusfinds.springboot_backend.model.User;
 import com.campusfinds.springboot_backend.repository.ItemClaimRepository;
 import com.campusfinds.springboot_backend.repository.ItemRepository;
+import com.campusfinds.springboot_backend.repository.NotificationRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
@@ -19,27 +22,37 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @Service
 public class ItemService {
 
+    private static final Logger LOGGER = Logger.getLogger(ItemService.class.getName());
+
     private final ItemRepository itemRepository;
     private final ItemClaimRepository claimRepository;
+    private final NotificationRepository notificationRepository;
     private final CurrentUserService currentUserService;
     private final NotificationService notificationService;
+    private final FileStorageService fileStorageService;
     private final ActivityLogService activityLogService;
 
     public ItemService(
             ItemRepository itemRepository,
             ItemClaimRepository claimRepository,
+            NotificationRepository notificationRepository,
             CurrentUserService currentUserService,
             NotificationService notificationService,
+            FileStorageService fileStorageService,
             ActivityLogService activityLogService
     ) {
         this.itemRepository = itemRepository;
         this.claimRepository = claimRepository;
+        this.notificationRepository = notificationRepository;
         this.currentUserService = currentUserService;
         this.notificationService = notificationService;
+        this.fileStorageService = fileStorageService;
         this.activityLogService = activityLogService;
     }
 
@@ -120,7 +133,7 @@ public class ItemService {
                         related.getReporter(),
                         NotificationType.MATCH,
                         "Possible match found",
-                        "A found report for \"" + saved.getItemName() + "\" was linked to your lost report.",
+                        matchNotificationMessage(saved.getItemName()),
                         related.getItemId(),
                         null);
             }
@@ -168,11 +181,61 @@ public class ItemService {
         Item item = requireItem(itemId);
         requireOwnerOrAdmin(item, actor);
         String itemName = item.getItemName();
+        String imageUrl = item.getImageUrl();
+        Item relatedLostItem = item.getRelatedItem();
+
+        notificationRepository.deleteByItemId(itemId);
+        if (relatedLostItem != null) {
+            notificationRepository.deleteByTypeAndItemIdAndMessage(
+                    NotificationType.MATCH,
+                    relatedLostItem.getItemId(),
+                    matchNotificationMessage(itemName));
+        }
         claimRepository.deleteByItemItemId(itemId);
         itemRepository.clearRelatedItemReferences(itemId);
         itemRepository.delete(item);
+        itemRepository.flush();
+
+        if (relatedLostItem != null
+                && relatedLostItem.getStatus() == ItemStatus.POSSIBLE_MATCH
+                && !itemRepository.existsByRelatedItemItemId(relatedLostItem.getItemId())) {
+            relatedLostItem.setStatus(ItemStatus.OPEN);
+            notificationRepository.deleteByTypeAndItemId(
+                    NotificationType.MATCH, relatedLostItem.getItemId());
+        }
+
         activityLogService.record(actor, "ITEM_DELETED",
                 actor.getFullname() + " deleted item #" + itemId + " (" + itemName + ").");
+
+        if (imageUrl != null
+                && !itemRepository.existsByImageUrlAndItemIdNot(imageUrl, itemId)) {
+            deleteItemImageAfterCommit(imageUrl);
+        }
+    }
+
+    private void deleteItemImageAfterCommit(String imageUrl) {
+        Runnable deletion = () -> {
+            try {
+                fileStorageService.deleteItemImage(imageUrl);
+            } catch (RuntimeException ex) {
+                LOGGER.log(Level.WARNING, "Failed to delete item image " + imageUrl + ".", ex);
+            }
+        };
+
+        if (TransactionSynchronizationManager.isSynchronizationActive()) {
+            TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+                @Override
+                public void afterCommit() {
+                    deletion.run();
+                }
+            });
+        } else {
+            deletion.run();
+        }
+    }
+
+    private static String matchNotificationMessage(String itemName) {
+        return "A found report for \"" + itemName + "\" was linked to your lost report.";
     }
 
     private void applyRequest(Item item, ItemRequest request, boolean creating) {

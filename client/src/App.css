@@ -2241,18 +2241,24 @@
 
 @media (max-width: 480px) {
   .brand-panel {
+    min-height: 250px;
+    padding: 24px 20px;
+  }
+
+  .brand-panel h1 {
+    font-size: 1.9rem;
+  }
+
+  .auth-copy {
+    margin-top: 14px;
+  }
+
+  .auth-benefits {
     display: none;
   }
 
-  .auth-page {
-    place-items: start;
-    background: #fff;
-  }
-
   .form-panel {
-    padding: 22px 16px;
-    border: 0;
-    box-shadow: none;
+    padding: 24px 20px;
   }
 
   .navbar-title strong {

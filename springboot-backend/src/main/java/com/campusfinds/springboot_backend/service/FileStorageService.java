@@ -13,16 +13,21 @@ import java.nio.file.StandardCopyOption;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 @Service
 public class FileStorageService {
 
+    private static final String ITEM_IMAGES_DIRECTORY = "item-images";
     private static final Set<String> ALLOWED_DIRECTORIES = Set.of(
-            "item-images", "claim-proofs", "student-ids");
+            ITEM_IMAGES_DIRECTORY, "claim-proofs", "student-ids");
     private static final Map<String, String> EXTENSIONS = Map.of(
             "image/jpeg", ".jpg",
             "image/png", ".png",
             "image/webp", ".webp");
+    private static final Pattern MANAGED_IMAGE_FILENAME = Pattern.compile(
+            "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}\\.(?:jpg|png|webp)$",
+            Pattern.CASE_INSENSITIVE);
 
     private final Path uploadRoot;
 
@@ -62,6 +67,30 @@ public class FileStorageService {
         }
 
         return new StoredFile(directory, filename, "/uploads/" + directory + "/" + filename);
+    }
+
+    public boolean deleteItemImage(String imageUrl) {
+        if (imageUrl == null || imageUrl.isBlank()) return false;
+
+        String prefix = "/uploads/" + ITEM_IMAGES_DIRECTORY + "/";
+        if (!imageUrl.startsWith(prefix)) return false;
+
+        String filename = imageUrl.substring(prefix.length());
+        if (!MANAGED_IMAGE_FILENAME.matcher(filename).matches()) return false;
+
+        Path targetDirectory = uploadRoot.resolve(ITEM_IMAGES_DIRECTORY).normalize();
+        Path target = targetDirectory.resolve(filename).normalize();
+        if (!target.startsWith(uploadRoot)
+                || !target.getParent().equals(targetDirectory)
+                || Files.isSymbolicLink(targetDirectory)) {
+            return false;
+        }
+
+        try {
+            return Files.deleteIfExists(target);
+        } catch (IOException ex) {
+            throw new IllegalStateException("Failed to delete the stored item image.", ex);
+        }
     }
 
     public record StoredFile(String directory, String filename, String url) {

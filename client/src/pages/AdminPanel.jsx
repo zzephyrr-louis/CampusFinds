@@ -203,14 +203,16 @@ function AdminPanel() {
         <>
           <StatisticsCards stats={stats} />
           <div className="admin-panel-tables">
-            <AdminTable
-              users={users}
-              currentUserId={currentUser?.user_id}
-              onEdit={openEditModal}
-              onDelete={(userId) => setDeleteCandidate(users.find((entry) => String(entry.id) === String(userId)) || null)}
-            />
+            <div className="admin-main-column">
+              <AdminClaimsTable claims={claims} busyClaimId={busyClaimId} onReview={openClaimReview} />
+              <AdminTable
+                users={users}
+                currentUserId={currentUser?.user_id}
+                onEdit={openEditModal}
+                onDelete={(userId) => setDeleteCandidate(users.find((entry) => String(entry.id) === String(userId)) || null)}
+              />
+            </div>
             <MatchLogs logs={logs} />
-            <AdminClaimsTable claims={claims} busyClaimId={busyClaimId} onReview={openClaimReview} />
           </div>
         </>
       )}

@@ -4,6 +4,8 @@ import com.campusfinds.springboot_backend.model.ClaimStatus;
 import com.campusfinds.springboot_backend.model.Item;
 import com.campusfinds.springboot_backend.model.ItemClaim;
 import com.campusfinds.springboot_backend.model.ItemStatus;
+import com.campusfinds.springboot_backend.model.Notification;
+import com.campusfinds.springboot_backend.model.NotificationType;
 import com.campusfinds.springboot_backend.model.User;
 import com.campusfinds.springboot_backend.model.UserStatus;
 import com.campusfinds.springboot_backend.repository.ActivityLogRepository;
@@ -12,6 +14,7 @@ import com.campusfinds.springboot_backend.repository.ItemRepository;
 import com.campusfinds.springboot_backend.repository.NotificationRepository;
 import com.campusfinds.springboot_backend.repository.UserRepository;
 import com.campusfinds.springboot_backend.security.JwtUtil;
+import com.campusfinds.springboot_backend.service.FileStorageService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -19,9 +22,13 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.mock.web.MockMultipartFile;
 import org.springframework.test.web.servlet.MockMvc;
 
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.time.LocalDate;
+import java.util.List;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -56,6 +63,9 @@ class CampusFindApiIntegrationTests {
 
     @Autowired
     private JwtUtil jwtUtil;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     @BeforeEach
     void cleanDatabase() {
@@ -163,6 +173,81 @@ class CampusFindApiIntegrationTests {
                                 """))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.errors.description").exists());
+    }
+
+    @Test
+    void deletingLinkedFoundItemsCleansNotificationsRestoresLostItemAndRemovesImages() throws Exception {
+        User owner = createUser("lost-owner", "Lost Owner", "lost.owner@campusfind.edu", "student");
+        User finder = createUser("finder", "Finder", "finder.delete@campusfind.edu", "student");
+        String eventDate = LocalDate.now().toString();
+
+        mockMvc.perform(post("/api/items/lost")
+                        .header("Authorization", bearer(owner))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(itemJson("Lost key ring", null, eventDate, null)))
+                .andExpect(status().isCreated());
+        Item lostItem = itemRepository.findAll().stream()
+                .filter(item -> item.getItemName().equals("Lost key ring"))
+                .findFirst().orElseThrow();
+
+        FileStorageService.StoredFile firstImage = storeTestItemImage("first-found.png");
+        mockMvc.perform(post("/api/items/found")
+                        .header("Authorization", bearer(finder))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(linkedFoundItemJson(
+                                "First found keys", eventDate, lostItem.getItemId(), firstImage.url())))
+                .andExpect(status().isCreated());
+        Item firstFound = itemRepository.findAll().stream()
+                .filter(item -> item.getItemName().equals("First found keys"))
+                .findFirst().orElseThrow();
+
+        FileStorageService.StoredFile secondImage = storeTestItemImage("second-found.png");
+        mockMvc.perform(post("/api/items/found")
+                        .header("Authorization", bearer(finder))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(linkedFoundItemJson(
+                                "Second found keys", eventDate, lostItem.getItemId(), secondImage.url())))
+                .andExpect(status().isCreated());
+        Item secondFound = itemRepository.findAll().stream()
+                .filter(item -> item.getItemName().equals("Second found keys"))
+                .findFirst().orElseThrow();
+
+        Notification directReference = new Notification();
+        directReference.setUser(owner);
+        directReference.setType(NotificationType.SYSTEM);
+        directReference.setTitle("Item update");
+        directReference.setMessage("This notification points directly to the first found item.");
+        directReference.setItemId(firstFound.getItemId());
+        notificationRepository.saveAndFlush(directReference);
+
+        assertThat(itemRepository.findById(lostItem.getItemId()).orElseThrow().getStatus())
+                .isEqualTo(ItemStatus.POSSIBLE_MATCH);
+        assertThat(notificationRepository.findAll()).hasSize(3);
+        assertThat(Files.exists(testImagePath(firstImage))).isTrue();
+        assertThat(Files.exists(testImagePath(secondImage))).isTrue();
+
+        mockMvc.perform(delete("/api/items/{id}", firstFound.getItemId())
+                        .header("Authorization", bearer(finder)))
+                .andExpect(status().isNoContent());
+
+        assertThat(itemRepository.findById(firstFound.getItemId())).isEmpty();
+        assertThat(itemRepository.findById(lostItem.getItemId()).orElseThrow().getStatus())
+                .isEqualTo(ItemStatus.POSSIBLE_MATCH);
+        List<Notification> remainingNotifications = notificationRepository.findAll();
+        assertThat(remainingNotifications).hasSize(1);
+        assertThat(remainingNotifications.get(0).getMessage()).contains("Second found keys");
+        assertThat(Files.exists(testImagePath(firstImage))).isFalse();
+        assertThat(Files.exists(testImagePath(secondImage))).isTrue();
+
+        mockMvc.perform(delete("/api/items/{id}", secondFound.getItemId())
+                        .header("Authorization", bearer(finder)))
+                .andExpect(status().isNoContent());
+
+        assertThat(itemRepository.findById(secondFound.getItemId())).isEmpty();
+        assertThat(itemRepository.findById(lostItem.getItemId()).orElseThrow().getStatus())
+                .isEqualTo(ItemStatus.OPEN);
+        assertThat(notificationRepository.findAll()).isEmpty();
+        assertThat(Files.exists(testImagePath(secondImage))).isFalse();
     }
 
     @Test
@@ -294,5 +379,30 @@ class CampusFindApiIntegrationTests {
 
     private static String claimJson(Long itemId, String reason) {
         return "{\"item_id\":" + itemId + ",\"reason\":\"" + reason + "\"}";
+    }
+
+    private FileStorageService.StoredFile storeTestItemImage(String originalFilename) {
+        return fileStorageService.storeImage(
+                new MockMultipartFile(
+                        "file", originalFilename, "image/png", "test-image".getBytes()),
+                "item-images");
+    }
+
+    private static Path testImagePath(FileStorageService.StoredFile image) {
+        return Path.of(System.getProperty("java.io.tmpdir"),
+                "campusfind-test-uploads", image.directory(), image.filename());
+    }
+
+    private static String linkedFoundItemJson(
+            String name,
+            String eventDate,
+            Long relatedItemId,
+            String imageUrl
+    ) {
+        return "{\"item_name\":\"" + name + "\",\"category\":\"General\","
+                + "\"description\":\"A detailed description long enough for reliable identification.\","
+                + "\"location\":\"Campus library\",\"event_date\":\"" + eventDate + "\","
+                + "\"condition\":\"Good\",\"storage_location\":\"Student Affairs desk\","
+                + "\"related_item_id\":" + relatedItemId + ",\"image_url\":\"" + imageUrl + "\"}";
     }
 }

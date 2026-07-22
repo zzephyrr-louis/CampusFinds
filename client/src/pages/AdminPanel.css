@@ -83,8 +83,14 @@
 .admin-panel-tables {
   min-width: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(300px, 320px);
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 340px);
   align-items: start;
+  gap: 18px;
+}
+
+.admin-main-column {
+  min-width: 0;
+  display: grid;
   gap: 18px;
 }
 
@@ -140,6 +146,16 @@
   scrollbar-width: thin;
 }
 
+.admin-claims-container .admin-table-scroll {
+  max-height: 360px;
+  overscroll-behavior: contain;
+}
+
+.logs-scroll {
+  max-height: 440px;
+  overscroll-behavior: contain;
+}
+
 .admin-table,
 .logs-table {
   width: 100%;
@@ -152,7 +168,23 @@
 }
 
 .logs-table {
-  min-width: 560px;
+  min-width: 100%;
+  table-layout: fixed;
+}
+
+.logs-table th:nth-child(1),
+.logs-table td:nth-child(1) {
+  width: 30%;
+}
+
+.logs-table th:nth-child(2),
+.logs-table td:nth-child(2) {
+  width: 30%;
+}
+
+.logs-table td {
+  overflow-wrap: anywhere;
+  vertical-align: top;
 }
 
 .admin-table th,
@@ -291,12 +323,13 @@
   background: #dcfce7;
 }
 
-.admin-claims-container {
-  grid-column: 1 / -1;
+.admin-claims-table {
+  min-width: 700px;
 }
 
-.admin-claims-table {
-  min-width: 1100px;
+.admin-claims-table th,
+.admin-claims-table td {
+  padding-inline: 10px;
 }
 
 .admin-claim-reason {
